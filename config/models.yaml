@@ -1,0 +1,25 @@
+models:
+  supervisor:
+    endpoint: "${VLLM_BASE_URL}"
+    model: "Qwen/Qwen2.5-72B-Instruct"
+    mock: true
+
+  coder:
+    endpoint: "${VLLM_BASE_URL}"
+    model: "Qwen/Qwen2.5-Coder-32B-Instruct"
+    mock: true
+
+  security:
+    endpoint: "${VLLM_BASE_URL}"
+    model: "deepseek-ai/DeepSeek-Coder-V2-Instruct"
+    mock: true
+
+  perf:
+    endpoint: "${VLLM_BASE_URL}"
+    model: "deepseek-ai/DeepSeek-Coder-V2-Instruct"
+    mock: true
+
+  deploy:
+    endpoint: "${VLLM_BASE_URL}"
+    model: "meta-llama/Llama-3.1-8B-Instruct"
+    mock: true
