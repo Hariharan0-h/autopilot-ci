@@ -18,6 +18,7 @@ import gradio as gr
 
 WEBHOOK_URL = "http://localhost:8000/webhook"
 STATUS_BASE = "http://localhost:8000/status"
+EVENTS_BASE = "http://localhost:8000/events"
 RUNS_URL = "http://localhost:8000/runs"
 
 AGENT_NAMES = [
@@ -93,10 +94,12 @@ def _update_agent_state_from_run(run_data: dict) -> None:
     for field, agent in status_map.items():
         result = run_data.get(field)
         if result:
-            agent_status = result.get("status", "waiting")
+            # SupervisorDecision has no status field — infer from presence
+            agent_status = result.get("status", "done" if agent == "supervisor" else "waiting")
             # Build a summary message
             if agent == "supervisor":
-                msg = result.get("summary", "Decision made.")[:120]
+                action = result.get("action", "")
+                msg = f"{action} — {result.get('summary', 'Decision made.')[:100]}"
             elif agent == "autofix":
                 msg = f"{result.get('fixes_applied', 0)} fix(es) applied."
             elif agent == "deployment":
@@ -160,12 +163,18 @@ def refresh_dashboard():
         grid_lines.append(f"**{name}**  {badge}\n{state['message']}")
     agent_grid_text = "\n\n".join(grid_lines)
 
-    # Build event log (append new events from server)
-    if run_data:
-        pipeline_status = run_data.get("status", "waiting")
-        log_entry = f"[{time.strftime('%H:%M:%S')}] Run status: {pipeline_status}"
-        if not _event_log or _event_log[-1] != log_entry:
-            _event_log.append(log_entry)
+    # Build event log from /events/{run_id}
+    if _current_run_id:
+        try:
+            resp = httpx.get(f"{EVENTS_BASE}/{_current_run_id}", timeout=3)
+            if resp.status_code == 200:
+                events = resp.json()
+                _event_log = [
+                    f"[{e['timestamp'][11:19]}] [{e['agent']}] {e['status'].upper()} — {e['message']}"
+                    for e in events
+                ]
+        except Exception:
+            pass
 
     log_text = "\n".join(_event_log[-50:])  # Last 50 lines
 
@@ -183,7 +192,8 @@ def refresh_dashboard():
         agent_grid_text,
         log_text,
         gpu_text,
-        gr.update(visible=report_visible, value=report_text),
+        gr.update(visible=report_visible),   # accordion visibility only
+        report_text,                          # markdown content
     )
 
 
@@ -309,7 +319,7 @@ def build_app() -> gr.Blocks:
         # Auto-refresh every 2s (gr.Timer unavailable in gradio<4.37, use demo.load)
         demo.load(
             fn=refresh_dashboard,
-            outputs=[agent_grid, event_log_box, gpu_box, report_accordion],
+            outputs=[agent_grid, event_log_box, gpu_box, report_accordion, report_md],
             every=2,
         )
 

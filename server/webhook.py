@@ -31,6 +31,30 @@ app.add_middleware(
 
 EVENT_QUEUE: asyncio.Queue = asyncio.Queue(maxsize=1000)
 ACTIVE_RUNS: dict[str, PipelineRun] = {}
+RUN_EVENTS: dict[str, list[dict]] = {}  # run_id → list of event dicts
+
+
+async def _drain_events(run_id: str) -> None:
+    """Drain EVENT_QUEUE into RUN_EVENTS[run_id] continuously until run completes."""
+    while True:
+        try:
+            event = EVENT_QUEUE.get_nowait()
+            if event.run_id == run_id:
+                RUN_EVENTS.setdefault(run_id, []).append({
+                    "agent": event.agent,
+                    "status": event.status.value,
+                    "message": event.message,
+                    "timestamp": event.timestamp,
+                })
+            else:
+                # Put back events for other runs
+                await EVENT_QUEUE.put(event)
+        except asyncio.QueueEmpty:
+            if run_id in ACTIVE_RUNS and ACTIVE_RUNS[run_id].status in (
+                AgentStatus.DONE, AgentStatus.FAILED
+            ):
+                break
+            await asyncio.sleep(0.1)
 
 
 async def _execute_pipeline(payload: WebhookPayload, run_id: str) -> None:
@@ -40,9 +64,13 @@ async def _execute_pipeline(payload: WebhookPayload, run_id: str) -> None:
         payload: WebhookPayload with repo info and commit SHAs.
         run_id: Unique ID for this pipeline run.
     """
+    RUN_EVENTS[run_id] = []
     try:
+        drain_task = asyncio.create_task(_drain_events(run_id))
         completed_run = await run_pipeline(payload, run_id, EVENT_QUEUE)
         ACTIVE_RUNS[run_id] = completed_run
+        await asyncio.sleep(0.3)  # Let drain catch final events
+        drain_task.cancel()
     except Exception as e:
         if run_id in ACTIVE_RUNS:
             ACTIVE_RUNS[run_id].status = AgentStatus.FAILED
@@ -98,6 +126,19 @@ async def get_run_status(run_id: str) -> dict:
     if run_id not in ACTIVE_RUNS:
         raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found.")
     return ACTIVE_RUNS[run_id].model_dump()
+
+
+@app.get("/events/{run_id}")
+async def get_run_events(run_id: str) -> list[dict]:
+    """Return all pipeline events emitted for a run (agent messages, status changes).
+
+    Args:
+        run_id: Pipeline run ID.
+
+    Returns:
+        List of event dicts with agent, status, message, timestamp.
+    """
+    return RUN_EVENTS.get(run_id, [])
 
 
 @app.get("/runs")
