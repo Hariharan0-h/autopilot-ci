@@ -124,7 +124,12 @@ def get_untested_functions(
     test_dir_obj = Path(test_dir)
     test_contents = ""
     if test_dir_obj.exists():
-        for test_file in test_dir_obj.rglob("*.py"):
+        for test_file in test_dir_obj.rglob("*"):
+            if not test_file.is_file() or test_file.suffix not in (".py", ".ts", ".js", ".cs", ".java", ".go", ".rb", ".kt"):
+                continue
+            # only include files that look like test files
+            if not any(k in test_file.stem.lower() for k in ("test", "spec")):
+                continue
             try:
                 test_contents += test_file.read_text(encoding="utf-8", errors="replace")
             except Exception:
@@ -261,13 +266,12 @@ def get_functions_without_docstrings(
 
     Args:
         source_code: Python source code as a string.
-        filepath: Optional file path for FunctionInfo.file field.
+        filepath: Optional file path for FunctionInfo metadata.
 
     Returns:
-        List of FunctionInfo for public functions missing docstrings.
+        List of FunctionInfo for functions missing docstrings.
     """
-    all_functions = get_functions(source_code, filepath)
     return [
-        fn for fn in all_functions
-        if not fn.name.startswith("_") and not fn.has_docstring
+        fn for fn in get_functions(source_code, filepath=filepath)
+        if not fn.has_docstring and not fn.name.startswith("_")
     ]

@@ -125,6 +125,19 @@ class DeploymentResult(BaseModel):
     error: Optional[str] = None
 
 
+class DockerBuildResult(BaseModel):
+    agent: str = "docker_scanner"
+    status: AgentStatus = AgentStatus.DONE
+    dockerfiles_found: list[str] = []
+    compose_files_found: list[str] = []
+    build_success: bool = False
+    build_output: str = ""
+    build_errors: str = ""
+    image_tag: str = ""
+    duration_seconds: float = 0.0
+    error: Optional[str] = None
+
+
 # ─── Supervisor models ─────────────────────────────────────────────────────────
 
 class SupervisorDecision(BaseModel):
@@ -171,9 +184,19 @@ class PipelineRun(BaseModel):
     supervisor_decision: Optional[SupervisorDecision] = None
     autofix_result: Optional[AutoFixResult] = None
     deployment_result: Optional[DeploymentResult] = None
+    docker_result: Optional[DockerBuildResult] = None
 
 
-# ─── Webhook payload ───────────────────────────────────────────────────────────
+# --- Payload models ----------------------------------------------------------
+
+class SubmitPayload(BaseModel):
+    """Accepted by POST /submit from the dashboard UI."""
+    path: str = Field(..., description="Host-local path to the codebase to scan")
+    base: str = Field("HEAD~1", description="Base branch or commit SHA")
+    head: str = Field("HEAD", description="Head branch or commit SHA")
+    mock: bool = Field(False, description="If true, runs demo simulation instead of real pipeline")
+    full_scan: bool = Field(False, description="If true, scan ALL source files not just the diff")
+
 
 class WebhookPayload(BaseModel):
     """Accepted by POST /webhook. Supports both GitHub-style and simplified."""
@@ -182,3 +205,4 @@ class WebhookPayload(BaseModel):
     head: str = Field(..., description="Head commit SHA (after push)")
     branch: str = "main"
     repo_url: str = ""   # For PR creation via GitHub API
+    full_scan: bool = Field(False, description="If true, scan ALL source files not just the diff")

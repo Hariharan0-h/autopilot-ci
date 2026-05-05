@@ -1,6 +1,21 @@
 """git_tools.py — gitpython wrappers for AutoPilot CI pipeline."""
 
 import os
+
+# All source file extensions the pipeline will scan
+SCAN_EXTENSIONS = (
+    ".py",                          # Python
+    ".cs",                          # C# / .NET
+    ".ts", ".tsx", ".js", ".jsx",   # TypeScript / JavaScript / Angular / React
+    ".java",                        # Java
+    ".go",                          # Go
+    ".rb",                          # Ruby
+    ".php",                         # PHP
+    ".cpp", ".cc", ".cxx", ".c",    # C / C++
+    ".rs",                          # Rust
+    ".kt",                          # Kotlin
+    ".swift",                       # Swift
+)
 from pathlib import Path
 import httpx
 import git
@@ -31,7 +46,7 @@ def get_diff(repo_path: str, base_commit: str, head_commit: str) -> dict[str, st
             diffs = head.diff(git.NULL_TREE, create_patch=True)
             result: dict[str, str] = {}
             for diff in diffs:
-                if diff.b_path and diff.b_path.endswith(".py"):
+                if diff.b_path and diff.b_path.endswith(SCAN_EXTENSIONS):
                     result[diff.b_path] = diff.diff.decode("utf-8", errors="replace")
             return result
         head, base = commits[0], commits[1]
@@ -40,7 +55,7 @@ def get_diff(repo_path: str, base_commit: str, head_commit: str) -> dict[str, st
     result: dict[str, str] = {}
     for diff in diffs:
         path = diff.b_path or diff.a_path
-        if path and path.endswith(".py"):
+        if path and path.endswith(SCAN_EXTENSIONS):
             result[path] = diff.diff.decode("utf-8", errors="replace")
     return result
 

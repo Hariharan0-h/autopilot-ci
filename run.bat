@@ -1,0 +1,1 @@
+python -c "import asyncio; from schemas import WebhookPayload; from pipeline.runner import run_pipeline; import uuid; q = asyncio.Queue(); p = WebhookPayload(repo_path=r'%1', base='%2', head='%3'); asyncio.run(run_pipeline(p, str(uuid.uuid4()), q))"

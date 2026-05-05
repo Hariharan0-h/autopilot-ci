@@ -144,6 +144,100 @@ header{
 .btn-trigger svg{width:10px;height:10px}
 .btn-trigger:disabled{opacity:.6;cursor:wait;transform:none;filter:saturate(.5)}
 
+/* ── Modal ── */
+.modal-backdrop{
+  position:fixed;inset:0;z-index:100;
+  background:rgba(0,0,0,.72);
+  backdrop-filter:blur(6px);
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;pointer-events:none;transition:opacity .22s;
+}
+.modal-backdrop.open{opacity:1;pointer-events:all}
+.modal{
+  width:520px;max-width:calc(100vw - 32px);
+  background:linear-gradient(160deg, #161a23, #10131a);
+  border:1px solid var(--line-2);border-radius:16px;
+  box-shadow:0 32px 80px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.04);
+  transform:translateY(18px) scale(.97);transition:transform .25s cubic-bezier(.34,1.4,.64,1);
+  overflow:hidden;
+}
+.modal-backdrop.open .modal{transform:translateY(0) scale(1)}
+.modal-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:20px 24px 0;
+}
+.modal-title{
+  font-size:14px;font-weight:700;letter-spacing:.06em;color:var(--ink-0);
+  display:flex;align-items:center;gap:10px;
+}
+.modal-title svg{width:16px;height:16px;stroke:var(--amber);stroke-width:1.6;fill:none}
+.modal-close{
+  width:28px;height:28px;border-radius:6px;border:1px solid var(--line);
+  background:transparent;color:var(--ink-2);cursor:pointer;font-size:16px;
+  display:flex;align-items:center;justify-content:center;transition:all .15s;
+}
+.modal-close:hover{background:rgba(255,255,255,.06);color:var(--ink-0)}
+.modal-body{padding:20px 24px}
+.field{display:flex;flex-direction:column;gap:7px;margin-bottom:18px}
+.field-label{
+  font-size:9px;font-weight:700;letter-spacing:.20em;text-transform:uppercase;
+  color:var(--ink-3);font-family:var(--mono);
+}
+.field-input{
+  width:100%;padding:10px 14px;border-radius:8px;
+  border:1px solid var(--line-2);
+  background:rgba(255,255,255,.03);
+  color:var(--ink-0);font-family:var(--mono);font-size:12px;letter-spacing:.03em;
+  outline:none;transition:border-color .2s, background .2s;
+}
+.field-input:focus{border-color:var(--amber);background:rgba(255,255,255,.055)}
+.field-input::placeholder{color:var(--ink-4)}
+.field-hint{font-size:10px;color:var(--ink-3);font-family:var(--mono);letter-spacing:.03em;margin-top:-2px}
+.branch-row{display:flex;align-items:center;gap:10px}
+.branch-row .field-input{flex:1}
+.branch-arrow{color:var(--amber);font-size:14px;flex-shrink:0;margin-top:0}
+.modal-divider{border:none;border-top:1px solid var(--line);margin:4px 0 18px}
+.modal-footer{
+  display:flex;align-items:center;justify-content:flex-end;gap:10px;
+  padding:0 24px 22px;
+}
+.btn-demo{
+  display:flex;align-items:center;gap:7px;
+  padding:10px 16px;border-radius:8px;
+  background:rgba(255,255,255,.04);
+  border:1px solid var(--line-2);
+  color:var(--ink-1);font-family:var(--font);
+  font-size:11px;font-weight:600;letter-spacing:.10em;text-transform:uppercase;
+  cursor:pointer;transition:all .15s;
+}
+.btn-demo:hover{background:rgba(255,255,255,.08);border-color:var(--line-3);color:var(--ink-0)}
+.btn-demo:disabled{opacity:.45;cursor:wait}
+
+.btn-report{
+  display:flex;align-items:center;gap:7px;
+  padding:10px 16px;border-radius:8px;
+  background:rgba(255,255,255,.04);
+  border:1px solid var(--jade);
+  color:var(--jade);font-family:var(--font);
+  font-size:11px;font-weight:600;letter-spacing:.10em;text-transform:uppercase;
+  cursor:pointer;transition:all .15s;text-decoration:none;
+}
+.btn-report:hover{background:var(--jade-bg);color:var(--jade)}
+.btn-report svg{width:10px;height:12px}
+/* pipeline info pill in header */
+.run-config-pill{
+  display:flex;align-items:center;gap:10px;
+  padding:7px 14px;border-radius:8px;
+  border:1px dashed var(--line-2);
+  background:rgba(255,255,255,.012);
+  font-family:var(--mono);font-size:10px;color:var(--ink-3);
+  cursor:pointer;transition:all .18s;max-width:320px;overflow:hidden;
+}
+.run-config-pill:hover{border-color:var(--amber);color:var(--ink-1);background:var(--amber-bg)}
+.run-config-pill svg{width:11px;height:11px;stroke:currentColor;stroke-width:1.5;fill:none;flex-shrink:0}
+.run-config-pill .rcp-path{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.run-config-pill .rcp-branches{color:var(--amber);white-space:nowrap;flex-shrink:0}
+
 /* THREE-COLUMN BODY */
 #main{
   display:grid;
@@ -387,22 +481,37 @@ header{
   </div>
 
   <div class="hdr-center">
+    <div class="run-config-pill" id="config-pill" onclick="openModal()">
+      <svg viewBox="0 0 11 11"><path d="M1 2h9M1 5.5h6M1 9h4"/></svg>
+      <span class="rcp-path" id="pill-path">Click to configure project path &amp; branches</span>
+      <span class="rcp-branches" id="pill-branches"></span>
+    </div>
+  </div>
+
+  <div class="hdr-right">
     <div class="run-pill" id="run-pill">
       <div class="pdot"></div>
       <span class="ptxt" id="run-state">Idle</span>
       <span class="pid" id="run-id">—</span>
     </div>
-  </div>
-
-  <div class="hdr-right">
     <div class="gpu-meter">
       <span class="gpu-label">GPU</span>
       <div class="gpu-bar"><div class="gpu-bar-fill" id="gpu-fill"></div></div>
       <span class="gpu-val" id="gpu-val">0%</span>
     </div>
-    <button class="btn-trigger" id="btn-trigger" onclick="triggerRun()">
+    <button class="btn-demo" id="btn-demo" onclick="triggerMockRun()">Demo</button>
+    <a class="btn-report" id="btn-report" style="display:none" target="_blank">
+      <svg viewBox="0 0 10 12" fill="none" stroke="currentColor" stroke-width="1.4">
+        <rect x="1" y="1" width="8" height="10" rx="1"/>
+        <line x1="3" y1="4" x2="7" y2="4"/>
+        <line x1="3" y1="6.5" x2="7" y2="6.5"/>
+        <line x1="3" y1="9" x2="5.5" y2="9"/>
+      </svg>
+      Report
+    </a>
+    <button class="btn-trigger" id="btn-trigger" onclick="openModal()">
       <svg viewBox="0 0 10 10" fill="currentColor"><polygon points="1.5,1 9,5 1.5,9"/></svg>
-      Trigger Run
+      Run Pipeline
     </button>
   </div>
 </header>
@@ -504,6 +613,8 @@ const AGENTS = [
     iconPath:'<path d="M9 2.5L13.5 7L7 13.5H2.5V9L9 2.5Z"/><line x1="6.5" y1="4" x2="11.5" y2="9"/><line x1="2" y1="14" x2="3.5" y2="12.5"/>' },
   { id:'deployment',       name:'Deploy',     model:'Llama-3.1-8B',   pos:[90,68],
     iconPath:'<path d="M8 1.5C10 1.5 12 4 12 7 12 9 11 11 8 14 5 11 4 9 4 7 4 4 6 1.5 8 1.5z"/><circle cx="8" cy="6.5" r="1.5"/><path d="M5 14.5h6"/>' },
+  { id:'docker_scanner',   name:'Docker',     model:'CLI build',      pos:[90,48],
+    iconPath:'<rect x="2" y="9" width="12" height="5" rx="1"/><rect x="2" y="4" width="4" height="4" rx=".5"/><rect x="7" y="4" width="4" height="4" rx=".5"/><line x1="8" y1="1.5" x2="8" y2="4"/><line x1="6" y1="1.5" x2="10" y2="1.5"/>' },
 ];
 
 const EDGES = [
@@ -511,10 +622,10 @@ const EDGES = [
   {from:'src',to:'security_scanner'},{from:'src',to:'perf_analyzer'},
   {from:'code_analyzer',to:'supervisor'},{from:'test_generator',to:'supervisor'},
   {from:'security_scanner',to:'supervisor'},{from:'perf_analyzer',to:'supervisor'},
-  {from:'supervisor',to:'autofix'},{from:'supervisor',to:'deployment'},
+  {from:'supervisor',to:'autofix'},{from:'supervisor',to:'deployment'},{from:'supervisor',to:'docker_scanner'},
 ];
 
-const STAGES = [{x:12,y:92,text:'TRIGGER'},{x:40,y:92,text:'PARALLEL · 4×'},{x:68,y:92,text:'AGGREGATE'},{x:90,y:92,text:'ACT'}];
+const STAGES = [{x:12,y:92,text:'TRIGGER'},{x:40,y:92,text:'PARALLEL · 4×'},{x:68,y:92,text:'AGGREGATE'},{x:90,y:92,text:'ACT · 3×'}];
 
 /* ─── State ─── */
 const state = { runId:null, running:false, agentStatus:{}, agentResult:{}, events:[], decision:null, gpuPct:0 };
@@ -864,6 +975,7 @@ async function runMockPipeline(){
   AGENTS.forEach(a => state.agentStatus[a.id] = 'waiting');
   renderAgents(); renderGraph(); renderLog(); renderDecision();
   $id('btn-trigger').disabled = true;
+  $id('btn-report').style.display = 'none';
   setRunPill('live','Running',state.runId);
 
   pushEvent('webhook','done','POST /webhook · ' + state.runId);
@@ -908,11 +1020,57 @@ async function runMockPipeline(){
   mockGpuRamp(8,800);
   setRunPill('done','Complete',state.runId);
   $id('btn-trigger').disabled = false;
+  $id('btn-demo').disabled = false;
   state.running = false;
   drawEdges();
 }
 
-window.triggerRun = function(){ runMockPipeline(); };
+window.triggerMockRun = function(){ runMockPipeline(); };
+
+window.triggerRealRun = async function(){
+  if (state.running) return;
+  const path  = ($id('repo-path')?.value || '').trim();
+  const base  = ($id('base-branch')?.value || '').trim() || 'HEAD~1';
+  const head  = ($id('head-branch')?.value || '').trim() || 'HEAD';
+
+  if (!path){
+    // No path entered — fall back to demo
+    runMockPipeline();
+    return;
+  }
+
+  state.running = true; state.runId = null;
+  state.events = []; state.decision = null; state.agentResult = {};
+  AGENTS.forEach(a => state.agentStatus[a.id] = 'waiting');
+  renderAgents(); renderGraph(); renderLog(); renderDecision();
+  $id('btn-trigger').disabled = true;
+  $id('btn-demo').disabled = true;
+  $id('btn-report').style.display = 'none';
+  setRunPill('live', 'Copying repo…', null);
+
+  try {
+    const resp = await fetch('/submit', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({path, base, head, mock: false, full_scan: window._fullScan || false}),
+    });
+    if (!resp.ok){
+      const err = await resp.json().catch(()=>({detail:'unknown error'}));
+      throw new Error(err.detail || resp.status);
+    }
+    const data = await resp.json();
+    state.runId = data.run_id;
+    setRunPill('live', 'Running', state.runId);
+    if (_pollTimer) clearInterval(_pollTimer);
+    _pollTimer = setInterval(pollBackend, 1500);
+  } catch(e){
+    console.error('Submit failed:', e);
+    state.running = false;
+    $id('btn-trigger').disabled = false;
+    $id('btn-demo').disabled = false;
+    setRunPill('', 'Error: ' + e.message, null);
+  }
+};
 
 /* ═══════════════════════════════════════════════════════════════
    REAL BACKEND INTEGRATION
@@ -924,31 +1082,9 @@ async function tryRealBackend(){
   try {
     const r = await fetch('/health', {cache:'no-store'});
     if (!r.ok) return;
-
-    window.triggerRun = async function(){
-      if (state.running) return;
-      state.running = true;
-      state.events = []; state.decision = null; state.agentResult = {};
-      AGENTS.forEach(a => state.agentStatus[a.id] = 'waiting');
-      renderAgents(); renderGraph(); renderLog(); renderDecision();
-      $id('btn-trigger').disabled = true;
-
-      try {
-        const resp = await fetch('/trigger', {method:'POST'});
-        if (!resp.ok) throw new Error('/trigger ' + resp.status);
-        const data = await resp.json();
-        state.runId = data.run_id;
-        setRunPill('live','Running',state.runId);
-        if (_pollTimer) clearInterval(_pollTimer);
-        _pollTimer = setInterval(pollBackend, 1500);
-      } catch(e){
-        console.error('Trigger failed:', e);
-        state.running = false;
-        $id('btn-trigger').disabled = false;
-        setRunPill('','Error',null);
-      }
-    };
-  } catch(e){ /* mock mode */ }
+    // Backend is live — triggerRealRun already handles /submit
+    // triggerMockRun still uses the JS mock pipeline
+  } catch(e){ /* backend not running — both buttons still work via mock */ }
 }
 
 async function pollBackend(){
@@ -965,6 +1101,7 @@ async function pollBackend(){
         code_analyzer:'code_result', test_generator:'test_result',
         security_scanner:'security_result', perf_analyzer:'perf_result',
         autofix:'autofix_result', deployment:'deployment_result',
+        docker_scanner:'docker_result',
       };
       for (const [agentId, field] of Object.entries(agentMap)){
         const result = run[field];
@@ -975,8 +1112,13 @@ async function pollBackend(){
         clearInterval(_pollTimer); _pollTimer = null;
         state.running = false;
         $id('btn-trigger').disabled = false;
+        $id('btn-demo').disabled = false;
         setRunPill(run.status==='done'?'done':'', run.status==='done'?'Complete':'Failed', state.runId);
         mockGpuRamp(8, 800);
+        // Show report download button
+        const rBtn = $id('btn-report');
+        rBtn.href = '/report/' + state.runId;
+        rBtn.style.display = 'flex';
       }
     }
     if (er.ok){ const evs = await er.json(); if (evs.length!==state.events.length){ state.events=evs; renderLog(); } }
@@ -992,6 +1134,122 @@ function boot(){
   tryRealBackend();
 }
 boot();
+
+/* ═══════════════════════════════════════════════════════════════
+   MODAL — project path + branch config
+═══════════════════════════════════════════════════════════════ */
+let _modalListenerAttached = false;
+window.openModal = function(){
+  const bd = $id('modal-backdrop');
+  if (!_modalListenerAttached){
+    bd.addEventListener('click', function(e){ if (e.target === bd) closeModal(); });
+    _modalListenerAttached = true;
+  }
+  bd.classList.add('open');
+  setTimeout(() => $id('modal-repo-path').focus(), 120);
+};
+
+window.closeModal = function(){
+  $id('modal-backdrop').classList.remove('open');
+};
+
+// Close on Escape
+document.addEventListener('keydown', function(e){
+  if (e.key === 'Escape') closeModal();
+});
+
+window.confirmAndRun = function(){
+  const path      = ($id('modal-repo-path').value  || '').trim();
+  const base      = ($id('modal-base').value       || '').trim() || 'HEAD~1';
+  const head      = ($id('modal-head').value       || '').trim() || 'HEAD';
+  const fullScan  = $id('modal-fullscan')?.checked || false;
+
+  // Update header pill
+  const pill = $id('config-pill');
+  $id('pill-path').textContent     = path || 'No path set';
+  $id('pill-branches').textContent = path ? (base + ' → ' + head) : '';
+
+  closeModal();
+
+  // Mirror values into the fields triggerRealRun() reads
+  // (inject hidden inputs so triggerRealRun works without changes)
+  ['repo-path','base-branch','head-branch'].forEach(id => {
+    if (!$id(id)){
+      const inp = document.createElement('input');
+      inp.type = 'hidden'; inp.id = id;
+      document.body.appendChild(inp);
+    }
+  });
+  $id('repo-path').value    = path;
+  $id('base-branch').value  = base;
+  $id('head-branch').value  = head;
+
+  // Pass full_scan flag through to triggerRealRun
+  window._fullScan = fullScan;
+  triggerRealRun();
+};
 </script>
+
+<!-- ── Modal markup ── -->
+<div class="modal-backdrop" id="modal-backdrop">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title-txt">
+    <div class="modal-header">
+      <div class="modal-title">
+        <svg viewBox="0 0 16 16">
+          <path d="M2 4h12M4 8h8M6 12h4"/>
+        </svg>
+        <span id="modal-title-txt">Configure Pipeline Run</span>
+      </div>
+      <button class="modal-close" onclick="closeModal()" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+
+      <div class="field">
+        <label class="field-label" for="modal-repo-path">Project Path</label>
+        <input class="field-input" id="modal-repo-path" type="text"
+               placeholder="H:\projects\my-app  or  /home/user/my-app"
+               spellcheck="false" autocomplete="off"/>
+        <span class="field-hint">Absolute path to the local repository root</span>
+      </div>
+
+      <hr class="modal-divider"/>
+
+      <div class="field">
+        <label class="field-label">Diff Range</label>
+        <div class="branch-row">
+          <input class="field-input" id="modal-base" type="text"
+                 placeholder="HEAD~1  or  main  or  commit SHA"
+                 spellcheck="false" autocomplete="off"/>
+          <span class="branch-arrow">&#8594;</span>
+          <input class="field-input" id="modal-head" type="text"
+                 placeholder="HEAD  or  feature-branch"
+                 spellcheck="false" autocomplete="off"/>
+        </div>
+        <span class="field-hint">Leave blank to use HEAD~1 &rarr; HEAD (latest commit)</span>
+      </div>
+
+      <div class="field" style="flex-direction:row;align-items:center;gap:10px;margin-bottom:6px">
+        <input type="checkbox" id="modal-fullscan" style="
+          width:16px;height:16px;accent-color:var(--amber);cursor:pointer;flex-shrink:0"/>
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--ink-1)">Full Repository Scan</div>
+          <div class="field-hint" style="margin-top:2px">Scan <em>all</em> source files, not just the diff — catches issues in unchanged files (e.g. syntax errors that pre-date this branch)</div>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn-demo" onclick="closeModal(); triggerMockRun();">
+        <svg viewBox="0 0 10 10" fill="currentColor" width="10" height="10"><polygon points="1.5,1 9,5 1.5,9" opacity=".7"/></svg>
+        Demo Run
+      </button>
+      <button class="btn-trigger" onclick="confirmAndRun()">
+        <svg viewBox="0 0 10 10" fill="currentColor"><polygon points="1.5,1 9,5 1.5,9"/></svg>
+        Run Pipeline
+      </button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>

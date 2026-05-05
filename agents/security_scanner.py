@@ -65,8 +65,10 @@ async def run_security_scanner(
     all_findings: list[Finding] = []
     cve_hits: list[str] = []
 
-    # Run bandit on each changed Python file
+    # Run bandit on Python files only; other languages skip bandit
     for filepath in changed_files:
+        if not filepath.endswith(".py"):
+            continue
         abs_path = str(Path(repo_path) / filepath)
         bandit_findings = run_bandit(abs_path)
         for f in bandit_findings:

@@ -68,7 +68,7 @@ def seed() -> None:
     print("\n─────────────────────────────────────────────────────")
     print("🚀 Quick start:")
     print()
-    print("  Terminal 1:  uvicorn server.webhook:app --port 8000 --reload")
+    print("  Terminal 1:  uvicorn server.webhook:app --port 8001 --reload")
     print("  Terminal 2:  python dashboard/app.py")
     print("  Browser:     http://localhost:7860")
     print("               → Click 'Trigger Demo Run'")

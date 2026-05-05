@@ -1,0 +1,51 @@
+version: "3.9"
+
+# ---------------------------------------------------------------------------
+# AutoPilot CI — Docker Compose environment
+#
+# Services:
+#   webhook    FastAPI pipeline server          → http://localhost:8001
+#   dashboard  Gradio live UI                  → http://localhost:7860
+#
+# External vLLM:
+#   Set VLLM_BASE_URL in .env.docker to point at your self-hosted vLLM
+#   e.g. VLLM_BASE_URL=http://192.168.1.50:8000/v1
+#
+# Scanning a real repo:
+#   Set SCAN_REPO_PATH in .env.docker to the host path of the repo you want
+#   to scan. It is mounted read-only at /repos/target inside the container.
+#   Pass repo_path=/repos/target when triggering a run.
+# ---------------------------------------------------------------------------
+
+services:
+
+  webhook:
+    build: .
+    command: uvicorn server.webhook:app --host 0.0.0.0 --port 8001 --reload
+    ports:
+      - "8001:8001"
+    env_file:
+      - .env.docker
+    volumes:
+      - ${SCAN_REPO_PATH:-./demo}:/repos/target:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8001/health').raise_for_status()"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  dashboard:
+    build: .
+    command: python dashboard/app.py
+    ports:
+      - "7860:7860"
+    env_file:
+      - .env.docker
+    environment:
+      # Override localhost URLs so the dashboard container reaches the webhook container
+      WEBHOOK_HOST: http://webhook:8001
+    depends_on:
+      webhook:
+        condition: service_healthy
+    restart: unless-stopped

@@ -13,17 +13,20 @@ Endpoints:
 """
 from __future__ import annotations
 import asyncio
+import shutil
 import subprocess
 import uuid
 from pathlib import Path
 
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from schemas import WebhookPayload, PipelineRun, AgentStatus
+from schemas import WebhookPayload, SubmitPayload, PipelineRun, AgentStatus
 from pipeline.runner import run_pipeline
+
+_REPO_STAGING = Path(__file__).parent.parent / "repo"   # autopilot-ci/repo/<run_id>/
 
 _DASHBOARD_DIR = Path(__file__).parent.parent / "dashboard"
 _DEMO_REPO = Path(__file__).parent.parent / "demo" / "sample_repo"
@@ -240,6 +243,71 @@ async def get_gpu_util() -> dict:
     return {"util": "0%", "source": "mock"}
 
 
+@app.post("/submit", status_code=202)
+async def submit_project(
+    body: SubmitPayload,
+    background_tasks: BackgroundTasks,
+) -> dict:
+    """Copy a local codebase into repo/<run_id>/ then trigger the pipeline.
+
+    Args:
+        body: SubmitPayload with local path, base/head refs, and mock flag.
+
+    Returns:
+        Dict with run_id, status, and the staging path the repo was copied to.
+    """
+    src = Path(body.path)
+    if not src.exists():
+        raise HTTPException(status_code=400, detail=f"Path not found: {body.path}")
+
+    run_id = str(uuid.uuid4())
+    dest = _REPO_STAGING / run_id
+    dest.mkdir(parents=True, exist_ok=True)
+
+    # git clone --local preserves .git so branch/commit refs resolve correctly.
+    # Works identically for GitHub, GitLab, Bitbucket, or any local bare repo.
+    clone = subprocess.run(
+        ["git", "clone", "--local", "--no-hardlinks", str(src), str(dest)],
+        capture_output=True, text=True,
+    )
+    if clone.returncode != 0:
+        # No git repo (bare folder) — fall back to plain file copy
+        shutil.copytree(
+            str(src), str(dest),
+            dirs_exist_ok=True,
+            ignore=shutil.ignore_patterns(
+                ".git", "node_modules", "__pycache__", "*.pyc",
+                "bin", "obj", ".vs", ".idea", "dist", "build",
+            ),
+        )
+
+    ACTIVE_RUNS[run_id] = PipelineRun(
+        run_id=run_id,
+        repo_path=str(dest),
+        base_commit=body.base,
+        head_commit=body.head,
+        status=AgentStatus.RUNNING,
+    )
+
+    if body.mock:
+        background_tasks.add_task(_run_demo_simulation, run_id)
+    else:
+        payload = WebhookPayload(
+            repo_path=str(dest),
+            base=body.base,
+            head=body.head,
+            full_scan=body.full_scan,
+        )
+        background_tasks.add_task(_execute_pipeline, payload, run_id)
+
+    return {
+        "run_id": run_id,
+        "status": "accepted",
+        "repo_staged_at": str(dest),
+        "status_url": f"/status/{run_id}",
+    }
+
+
 @app.post("/webhook", status_code=202)
 async def receive_webhook(
     payload: WebhookPayload,
@@ -322,6 +390,50 @@ async def list_runs() -> list[dict]:
         }
         for run in ACTIVE_RUNS.values()
     ]
+
+
+@app.get("/report/{run_id}")
+async def download_report(run_id: str) -> Response:
+    """Stream the PDF report for a completed pipeline run.
+
+    Args:
+        run_id: Pipeline run ID returned by POST /webhook or /submit.
+
+    Returns:
+        PDF bytes as application/pdf, or generates on-the-fly if not cached.
+
+    Raises:
+        HTTPException 404: If run_id is not found.
+        HTTPException 425: If run is still in progress.
+    """
+    if run_id not in ACTIVE_RUNS:
+        raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found.")
+
+    run = ACTIVE_RUNS[run_id]
+    if run.status.value not in ("done", "failed"):
+        raise HTTPException(status_code=425, detail="Run is still in progress.")
+
+    # Check for pre-saved report first
+    reports_dir = Path(__file__).parent.parent / "reports"
+    saved = reports_dir / f"report_{run_id[:8]}.pdf"
+    if saved.exists():
+        return FileResponse(
+            str(saved),
+            media_type="application/pdf",
+            filename=f"autopilot-report-{run_id[:8]}.pdf",
+        )
+
+    # Generate on-the-fly (e.g. demo runs)
+    try:
+        from agents.report_generator import generate_report
+        pdf_bytes = generate_report(run)
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="autopilot-report-{run_id[:8]}.pdf"'},
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Report generation failed: {e}")
 
 
 @app.get("/health")

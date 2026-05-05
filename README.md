@@ -86,7 +86,7 @@ pip install vllm[rocm]
 
 # Serve the coder model (fits in MI300X's 192GB HBM3)
 vllm serve Qwen/Qwen2.5-Coder-32B-Instruct \
-  --port 8000 \
+  --port 8001 \
   --tensor-parallel-size 4 \
   --dtype float16
 
@@ -103,7 +103,7 @@ vllm serve Qwen/Qwen2.5-72B-Instruct \
 cp .env.example .env
 
 # Set your vLLM endpoint
-VLLM_BASE_URL=http://your-mi300x-instance:8000/v1
+VLLM_BASE_URL=http://your-mi300x-instance:8001/v1
 ```
 
 ### 4. Switch to live mode
@@ -130,7 +130,7 @@ models:
 
 2. Configure a GitHub webhook:
    - Go to **Settings → Webhooks → Add webhook**
-   - Payload URL: `http://your-server:8000/webhook`
+   - Payload URL: `http://your-server:8001/webhook`
    - Content type: `application/json`
    - Events: select **Push**
 

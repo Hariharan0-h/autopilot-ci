@@ -5,8 +5,8 @@ install:
 
 demo:
 	python demo/seed_bugs.py
-	@echo "Starting webhook server on :8000..."
-	uvicorn server.webhook:app --port 8000 --reload &
+	@echo "Starting webhook server on :8001..."
+	uvicorn server.webhook:app --port 8001 --reload &
 	@sleep 2
 	@echo "Starting dashboard on :7860..."
 	python dashboard/app.py

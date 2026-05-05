@@ -2,13 +2,14 @@
 dashboard/app.py — Gradio live dashboard for AutoPilot CI.
 
 Components:
-  1. "Trigger demo run" button → POST to http://localhost:8000/webhook
+  1. "Trigger demo run" button → POST to http://localhost:8001/webhook
   2. Agent status grid — 7 cards showing status + last message per agent
   3. Live event log — scrolling textbox, auto-refresh every 2s
   4. Final report accordion — visible after run completes
   5. AMD GPU utilization — reads rocm-smi every 3s
 """
 from __future__ import annotations
+import os
 import subprocess
 import time
 from pathlib import Path
@@ -16,10 +17,11 @@ from pathlib import Path
 import httpx
 import gradio as gr
 
-WEBHOOK_URL = "http://localhost:8000/webhook"
-STATUS_BASE = "http://localhost:8000/status"
-EVENTS_BASE = "http://localhost:8000/events"
-RUNS_URL = "http://localhost:8000/runs"
+_BASE = os.getenv("WEBHOOK_HOST", "http://localhost:8001")
+WEBHOOK_URL = f"{_BASE}/webhook"
+STATUS_BASE = f"{_BASE}/status"
+EVENTS_BASE = f"{_BASE}/events"
+RUNS_URL    = f"{_BASE}/runs"
 
 AGENT_NAMES = [
     "code_analyzer",
@@ -144,7 +146,7 @@ def trigger_demo_run():
         else:
             return f"❌ Webhook returned {resp.status_code}: {resp.text[:200]}"
     except Exception as e:
-        return f"❌ Could not reach webhook server: {e}\nMake sure `uvicorn server.webhook:app --port 8000` is running."
+        return f"❌ Could not reach webhook server: {e}\nMake sure `uvicorn server.webhook:app --port 8001` is running."
 
 
 def refresh_dashboard():

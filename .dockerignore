@@ -1,0 +1,11 @@
+.git
+__pycache__
+*.pyc
+*.pyo
+.env
+.env.docker
+demo/sample_repo
+/tmp
+*.log
+.pytest_cache
+node_modules

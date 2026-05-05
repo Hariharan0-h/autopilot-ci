@@ -16,10 +16,15 @@ from rich.console import Console
 
 console = Console()
 
-_SYSTEM_PROMPT = """You are a senior code reviewer in an automated CI pipeline.
+_SYSTEM_PROMPT_PY = """You are a senior code reviewer in an automated CI pipeline.
 Given a Python function, write a concise 1-2 sentence plain-English review comment
 explaining the issue and what the developer should do to fix it.
 Be direct and actionable. Do not use bullet points."""
+
+_SYSTEM_PROMPT_GENERIC = """You are a senior code reviewer in an automated CI pipeline.
+Review the following source file for code quality issues such as high complexity,
+missing documentation, overly long functions, poor naming, or structural problems.
+Write concise plain-English findings, one per issue. Be direct and actionable."""
 
 
 async def run_code_analyzer(
@@ -27,8 +32,8 @@ async def run_code_analyzer(
 ) -> CodeAnalysisResult:
     """Analyze changed files for code quality issues.
 
-    Flags functions with cyclomatic complexity > 10, missing docstrings,
-    or length > 50 lines. Calls the coder LLM for human-readable comments.
+    For .py files: uses AST analysis (complexity, docstrings, length) + LLM comment.
+    For all other file types: sends source directly to LLM for a generic review.
 
     Args:
         changed_files: Dict mapping filepath to source code string.
@@ -40,61 +45,62 @@ async def run_code_analyzer(
     findings: list[Finding] = []
 
     for filepath, source in changed_files.items():
-        functions = get_functions(source, filepath=filepath)
+        if filepath.endswith(".py"):
+            # Python: deep AST-based analysis
+            functions = get_functions(source, filepath=filepath)
 
-        for fn in functions:
-            issues: list[tuple[str, Severity, str, str]] = []
+            for fn in functions:
+                issues: list[tuple[str, Severity, str, str]] = []
 
-            fn_length = fn.end_line - fn.start_line + 1
+                fn_length = fn.end_line - fn.start_line + 1
 
-            if fn.cyclomatic_complexity > 10:
-                issues.append((
-                    "high_complexity",
-                    Severity.MEDIUM,
-                    f"Function `{fn.name}` has cyclomatic complexity {fn.cyclomatic_complexity} (threshold: 10).",
-                    "Split into smaller, single-responsibility functions.",
-                ))
+                if fn.cyclomatic_complexity > 10:
+                    issues.append((
+                        "high_complexity",
+                        Severity.MEDIUM,
+                        f"Function `{fn.name}` has cyclomatic complexity {fn.cyclomatic_complexity} (threshold: 10).",
+                        "Split into smaller, single-responsibility functions.",
+                    ))
 
-            if not fn.has_docstring and not fn.name.startswith("_"):
-                issues.append((
-                    "missing_docstring",
-                    Severity.LOW,
-                    f"Public function `{fn.name}` is missing a docstring.",
-                    f"Add a docstring describing purpose, args, and return value.",
-                ))
+                if not fn.has_docstring and not fn.name.startswith("_"):
+                    issues.append((
+                        "missing_docstring",
+                        Severity.LOW,
+                        f"Public function `{fn.name}` is missing a docstring.",
+                        "Add a docstring describing purpose, args, and return value.",
+                    ))
 
-            if fn_length > 50:
-                issues.append((
-                    "long_function",
-                    Severity.LOW,
-                    f"Function `{fn.name}` is {fn_length} lines long (threshold: 50).",
-                    "Break into smaller helper functions.",
-                ))
+                if fn_length > 50:
+                    issues.append((
+                        "long_function",
+                        Severity.LOW,
+                        f"Function `{fn.name}` is {fn_length} lines long (threshold: 50).",
+                        "Break into smaller helper functions.",
+                    ))
 
-            for category, severity, message, suggestion in issues:
-                # Ask LLM for a review comment
-                try:
-                    review = await llm_call(
-                        "coder",
-                        _SYSTEM_PROMPT,
-                        f"File: {filepath}\nFunction: {fn.name}\nIssue: {message}\n"
-                        f"Source:\n{fn.source[:800]}",
-                        temperature=0.2,
-                        max_tokens=256,
-                    )
-                except Exception:
-                    review = message
+                for category, severity, message, suggestion in issues:
+                    try:
+                        review = await llm_call(
+                            "coder",
+                            _SYSTEM_PROMPT_PY,
+                            f"File: {filepath}\nFunction: {fn.name}\nIssue: {message}\n"
+                            f"Source:\n{fn.source[:800]}",
+                            temperature=0.2,
+                            max_tokens=256,
+                        )
+                    except Exception:
+                        review = message
 
-                findings.append(Finding(
-                    file=filepath,
-                    line=fn.start_line,
-                    severity=severity,
-                    category=category,
-                    message=review or message,
-                    snippet=fn.source[:200],
-                    suggestion=suggestion,
-                    auto_fixable=False,
-                ))
+                    findings.append(Finding(
+                        file=filepath,
+                        line=fn.start_line,
+                        severity=severity,
+                        category=category,
+                        message=review or message,
+                        snippet=fn.source[:200],
+                        suggestion=suggestion,
+                        auto_fixable=False,
+                    ))
 
     return CodeAnalysisResult(
         status=AgentStatus.DONE,
