@@ -17,3 +17,6 @@ COPY . .
 
 # Repos to scan are mounted at runtime under /repos
 RUN mkdir -p /repos
+
+EXPOSE 8001
+CMD ["sh", "-c", "uvicorn server.webhook:app --host 0.0.0.0 --port ${PORT:-8001}"]
