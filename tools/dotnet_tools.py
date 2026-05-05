@@ -43,17 +43,35 @@ def run_dotnet_build(repo_path: str) -> list[Finding]:
     """
     root = Path(repo_path)
 
-    # Prefer solution file; fall back to first csproj
-    targets = list(root.rglob("*.sln")) or list(root.rglob("*.csproj"))
+    _BUILD_SKIP = {"obj", "bin", ".vs", ".idea", "packages"}
+
+    def _is_artifact(p: Path) -> bool:
+        return any(part in _BUILD_SKIP for part in p.parts)
+
+    sln_files = sorted(
+        [p for p in root.rglob("*.sln") if not _is_artifact(p)],
+        key=lambda p: len(p.parts),
+    )
+    csproj_files = sorted(
+        [p for p in root.rglob("*.csproj") if not _is_artifact(p)],
+        key=lambda p: len(p.parts),
+    )
+    targets = sln_files or csproj_files
     if not targets:
         return []
 
     target = str(targets[0])
 
     try:
+        # Restore packages first so build errors are compiler errors, not restore errors
+        subprocess.run(
+            ["dotnet", "restore", target, "-v", "quiet"],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
         result = subprocess.run(
-            ["dotnet", "build", target, "--no-restore", "-v", "quiet",
-             "/clp:NoSummary"],
+            ["dotnet", "build", target, "--no-restore", "-v", "quiet", "/clp:NoSummary"],
             capture_output=True,
             text=True,
             timeout=120,
@@ -69,7 +87,7 @@ def run_dotnet_build(repo_path: str) -> list[Finding]:
             category="build_timeout",
             message="dotnet build timed out after 120 s — partial results only.",
         )]
-    except Exception as e:
+    except Exception:
         return []
 
     findings: list[Finding] = []
@@ -82,11 +100,11 @@ def run_dotnet_build(repo_path: str) -> list[Finding]:
             continue
 
         file_path = m.group("file").strip()
-        # Make path relative to repo root if possible
+        # Skip diagnostics from SDK/system paths (e.g. NETSDK* from SDK targets files)
         try:
             file_path = str(Path(file_path).relative_to(root))
         except ValueError:
-            pass
+            continue  # not under repo root — infrastructure error, not user code
 
         severity = _LEVEL_SEVERITY.get(m.group("level").lower(), Severity.INFO)
         findings.append(Finding(
@@ -97,5 +115,12 @@ def run_dotnet_build(repo_path: str) -> list[Finding]:
             message=f"{m.group('code')}: {m.group('msg').strip()}",
             auto_fixable=False,
         ))
+
+    # Drop diagnostics from generated build artifacts (obj/, bin/)
+    _ARTIFACT_DIRS = {"obj", "bin"}
+    findings = [
+        f for f in findings
+        if not any(part in _ARTIFACT_DIRS for part in Path(f.file).parts)
+    ]
 
     return findings

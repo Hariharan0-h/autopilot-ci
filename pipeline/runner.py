@@ -264,6 +264,15 @@ async def run_pipeline(
                 capture_output=True, text=True, timeout=30,
             )
             tracked = [ln.strip() for ln in result.stdout.splitlines() if ln.strip()]
+            # Also include untracked files not excluded by .gitignore (e.g. new files
+            # with syntax errors that haven't been staged yet)
+            untracked_result = subprocess.run(
+                ["git", "ls-files", "--others", "--exclude-standard"],
+                cwd=str(repo_root),
+                capture_output=True, text=True, timeout=30,
+            )
+            untracked = [ln.strip() for ln in untracked_result.stdout.splitlines() if ln.strip()]
+            tracked = list(dict.fromkeys(tracked + untracked))
         except Exception:
             tracked = []
 
