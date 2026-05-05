@@ -70,6 +70,28 @@ hardcoded realistic responses, so you can see the full pipeline flow on any lapt
 
 ---
 
+---
+
+## Windows Quickstart
+
+```bash
+git clone <repo>
+cd autopilot-ci
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Seed the demo repo with intentional bugs + start everything
+make demo
+
+# Run this cmd
+uvicorn server.webhook:app --port 8001 --reload
+
+# Open the dashboard
+# http://localhost:7860
+# Click "Trigger Demo Run"
+```
+
 ## AMD Developer Cloud Setup (Live Mode)
 
 ### 1. Launch an MI300X instance
