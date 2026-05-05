@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AutoPilot CI — Multi-Agent Pipeline</title>
+<style>
+/* ──────────────────────────────────────────────────────────────
+   AutoPilot CI — original aesthetic
+   Century Gothic · ink+amber+jade · SVG-only iconography
+─────────────────────────────────────────────────────────────── */
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg-0:#0b0d12;
+  --bg-1:#10131a;
+  --bg-2:#161a23;
+  --bg-3:#1c2230;
+  --line:rgba(255,255,255,.055);
+  --line-2:rgba(255,255,255,.10);
+  --line-3:rgba(255,255,255,.16);
+  --ink-0:#f3efe6;
+  --ink-1:#cdc8bd;
+  --ink-2:#8b8a85;
+  --ink-3:#5b5d65;
+  --ink-4:#3a3d47;
+  --amber:    oklch(0.78 0.14 70);
+  --amber-d:  oklch(0.55 0.12 70);
+  --amber-bg: oklch(0.78 0.14 70 / 0.10);
+  --jade:     oklch(0.78 0.14 165);
+  --jade-bg:  oklch(0.78 0.14 165 / 0.10);
+  --azure:    oklch(0.78 0.14 235);
+  --azure-bg: oklch(0.78 0.14 235 / 0.10);
+  --rose:     oklch(0.70 0.15 25);
+  --rose-bg:  oklch(0.70 0.15 25 / 0.10);
+  --font: "Century Gothic","Avenir Next","Futura","Trebuchet MS",sans-serif;
+  --mono: "JetBrains Mono","Cascadia Code","SF Mono",ui-monospace,monospace;
+}
+
+html,body{
+  width:100vw;height:100vh;overflow:hidden;
+  background:
+    radial-gradient(ellipse 1200px 600px at 80% -10%, oklch(0.30 0.05 70 / 0.18), transparent 60%),
+    radial-gradient(ellipse 1000px 800px at -10% 110%, oklch(0.30 0.05 235 / 0.10), transparent 60%),
+    var(--bg-0);
+  color:var(--ink-0);
+  font-family:var(--font);
+  letter-spacing:.01em;
+  -webkit-font-smoothing:antialiased;
+}
+
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.012) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.012) 1px, transparent 1px);
+  background-size:48px 48px;
+  mask-image:radial-gradient(ellipse 70% 60% at 50% 50%, #000 30%, transparent 100%);
+}
+
+#app{
+  position:relative;z-index:1;
+  display:grid;
+  grid-template-rows:64px 1fr;
+  height:100vh;width:100vw;
+}
+
+/* HEADER */
+header{
+  display:grid;
+  grid-template-columns:auto 1fr auto;
+  align-items:center;gap:32px;
+  padding:0 28px;
+  border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg, rgba(255,255,255,.012), transparent);
+}
+
+.brand{display:flex;align-items:center;gap:14px}
+.brand-mark{
+  width:38px;height:38px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  border:1px solid var(--line-2);border-radius:9px;
+  background:linear-gradient(135deg, var(--bg-2), var(--bg-1));
+  position:relative;overflow:hidden;
+}
+.brand-mark::after{
+  content:'';position:absolute;inset:0;border-radius:9px;
+  background:radial-gradient(circle at 30% 30%, var(--amber-bg), transparent 60%);
+  pointer-events:none;
+}
+.brand-mark svg{width:20px;height:20px;position:relative;z-index:1}
+.brand-text{display:flex;flex-direction:column;gap:2px;line-height:1}
+.brand-name{font-size:14px;font-weight:700;letter-spacing:.06em;color:var(--ink-0)}
+.brand-name em{color:var(--amber);font-style:normal;font-weight:700}
+.brand-sub{font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-3);font-family:var(--mono)}
+
+.hdr-center{display:flex;align-items:center;justify-content:center;gap:18px}
+.run-pill{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 16px;border-radius:999px;
+  border:1px solid var(--line-2);
+  background:rgba(255,255,255,.015);
+  font-size:11px;letter-spacing:.06em;color:var(--ink-1);
+}
+.run-pill .pdot{
+  width:7px;height:7px;border-radius:50%;background:var(--ink-3);
+  box-shadow:0 0 0 3px transparent;transition:all .3s;
+}
+.run-pill.live .pdot{background:var(--amber);box-shadow:0 0 0 3px var(--amber-bg);animation:breathe 1.6s infinite}
+.run-pill.done .pdot{background:var(--jade);box-shadow:0 0 0 3px var(--jade-bg)}
+.run-pill .ptxt{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase}
+.run-pill .pid{color:var(--ink-3);font-family:var(--mono);font-size:10px}
+
+.hdr-right{display:flex;align-items:center;gap:14px}
+
+.gpu-meter{
+  display:flex;align-items:center;gap:10px;
+  padding:7px 12px;border-radius:8px;
+  border:1px solid var(--line-2);
+  background:linear-gradient(135deg, rgba(255,255,255,.015), transparent);
+}
+.gpu-meter .gpu-label{font-family:var(--mono);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-3)}
+.gpu-bar{width:88px;height:5px;border-radius:3px;background:rgba(255,255,255,.04);overflow:hidden}
+.gpu-bar-fill{
+  height:100%;width:0%;
+  background:linear-gradient(90deg, var(--amber-d), var(--amber));
+  transition:width .8s cubic-bezier(.4,0,.2,1);
+  box-shadow:0 0 12px var(--amber-bg);
+}
+.gpu-val{font-family:var(--mono);font-size:11px;color:var(--ink-0);min-width:34px;text-align:right}
+
+.btn-trigger{
+  display:flex;align-items:center;gap:9px;
+  padding:10px 18px;border-radius:8px;
+  background:linear-gradient(135deg, var(--amber), var(--amber-d));
+  border:1px solid oklch(0.85 0.12 70);
+  color:#1a1408;font-family:var(--font);
+  font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  cursor:pointer;
+  box-shadow:0 4px 14px var(--amber-bg), inset 0 1px 0 rgba(255,255,255,.25);
+  transition:transform .12s, box-shadow .15s, filter .15s;
+}
+.btn-trigger:hover{transform:translateY(-1px);filter:brightness(1.06);box-shadow:0 6px 20px oklch(0.78 0.14 70 / 0.30), inset 0 1px 0 rgba(255,255,255,.3)}
+.btn-trigger:active{transform:translateY(0)}
+.btn-trigger svg{width:10px;height:10px}
+.btn-trigger:disabled{opacity:.6;cursor:wait;transform:none;filter:saturate(.5)}
+
+/* THREE-COLUMN BODY */
+#main{
+  display:grid;
+  grid-template-columns: 260px 1fr 300px;
+  height:calc(100vh - 64px);
+  overflow:hidden;
+}
+@media (max-width:1280px){ #main{ grid-template-columns: 230px 1fr 270px } }
+@media (max-width:1080px){ #main{ grid-template-columns: 210px 1fr 240px } }
+
+.col{display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.col + .col{border-left:1px solid var(--line)}
+
+.col-head{
+  display:flex;align-items:center;gap:10px;
+  padding:14px 20px;
+  border-bottom:1px solid var(--line);
+  font-size:10px;font-weight:700;letter-spacing:.20em;
+  text-transform:uppercase;color:var(--ink-2);
+  font-family:var(--mono);
+}
+.col-head svg{width:11px;height:11px;opacity:.7;color:var(--amber)}
+.col-head .ch-tag{
+  margin-left:auto;font-size:9px;color:var(--ink-3);letter-spacing:.14em;
+  padding:2px 8px;border-radius:4px;border:1px solid var(--line);background:rgba(255,255,255,.015);
+}
+
+/* LEFT — AGENT ROSTER */
+#agents{display:flex;flex-direction:column}
+#agents-list{flex:1;padding:12px;display:flex;flex-direction:column;gap:8px;overflow:hidden}
+
+.acard{
+  display:grid;grid-template-columns:36px 1fr auto;
+  align-items:center;gap:12px;
+  padding:11px 13px;border-radius:10px;
+  border:1px solid var(--line);
+  background:linear-gradient(135deg, var(--bg-1), var(--bg-2));
+  position:relative;overflow:hidden;
+  transition:border-color .25s;
+}
+.acard::before{
+  content:'';position:absolute;left:0;top:0;bottom:0;width:2px;
+  background:var(--ink-4);transition:background .3s, box-shadow .3s;
+}
+.acard.running::before{background:var(--azure);box-shadow:0 0 12px var(--azure-bg)}
+.acard.done::before{background:var(--jade);box-shadow:0 0 10px var(--jade-bg)}
+.acard.failed::before{background:var(--rose);box-shadow:0 0 10px var(--rose-bg)}
+
+.acard-icon{
+  width:36px;height:36px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(255,255,255,.025);border:1px solid var(--line);
+}
+.acard-icon svg{width:16px;height:16px;stroke:var(--ink-2);stroke-width:1.5;fill:none;transition:stroke .3s}
+.acard.running .acard-icon{background:var(--azure-bg)}
+.acard.running .acard-icon svg{stroke:var(--azure)}
+.acard.done .acard-icon{background:var(--jade-bg)}
+.acard.done .acard-icon svg{stroke:var(--jade)}
+.acard.failed .acard-icon{background:var(--rose-bg)}
+.acard.failed .acard-icon svg{stroke:var(--rose)}
+
+.acard-body{min-width:0;display:flex;flex-direction:column;gap:3px}
+.acard-name{font-size:12.5px;font-weight:700;letter-spacing:.02em;color:var(--ink-0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acard-msg{font-size:10px;color:var(--ink-2);font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.4}
+
+.acard-status{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
+.acard-stxt{font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-family:var(--mono);color:var(--ink-3)}
+.acard.running .acard-stxt{color:var(--azure)}
+.acard.done .acard-stxt{color:var(--jade)}
+.acard.failed .acard-stxt{color:var(--rose)}
+.acard-spinner{width:13px;height:13px;border:1.5px solid rgba(255,255,255,.06);border-top-color:var(--ink-2);border-radius:50%;display:none}
+.acard.running .acard-spinner{display:block;animation:spin 1s linear infinite;border-top-color:var(--azure)}
+.acard-check{display:none;width:13px;height:13px;align-items:center;justify-content:center}
+.acard.done .acard-check,.acard.failed .acard-check{display:flex}
+.acard-check svg{width:13px;height:13px;stroke:var(--jade);stroke-width:2;fill:none}
+.acard.failed .acard-check svg{stroke:var(--rose)}
+
+/* CENTER — PIPELINE GRAPH */
+#center{display:grid;grid-template-rows:1fr auto;overflow:hidden}
+#graph-wrap{position:relative;padding:24px 28px;display:flex;flex-direction:column;overflow:hidden}
+#graph-wrap .col-head{padding:0 0 14px;border:none}
+
+#graph{
+  flex:1;position:relative;border-radius:14px;
+  border:1px solid var(--line);
+  background:radial-gradient(circle at 50% 50%, rgba(255,255,255,.015), transparent 60%), linear-gradient(135deg, var(--bg-1), var(--bg-0));
+  overflow:hidden;
+}
+#graph::before{
+  content:'';position:absolute;inset:0;
+  background-image:linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px);
+  background-size:32px 32px;
+  mask-image:radial-gradient(ellipse 80% 70% at 50% 50%, #000 30%, transparent 90%);
+}
+#edges{position:absolute;inset:0;width:100%;height:100%}
+#nodes{position:absolute;inset:0}
+
+.gnode{position:absolute;transform:translate(-50%,-50%)}
+.gnode-inner{
+  display:flex;flex-direction:row;align-items:center;gap:8px;
+  padding:7px 11px 7px 7px;border-radius:999px;
+  border:1px solid var(--line-2);
+  background:linear-gradient(135deg, var(--bg-2), var(--bg-1));
+  position:relative;transition:all .3s;white-space:nowrap;
+}
+.gnode-inner::after{
+  content:'';position:absolute;inset:-1px;border-radius:10px;
+  pointer-events:none;opacity:0;transition:opacity .3s;
+}
+.gnode.running .gnode-inner{border-color:var(--azure)}
+.gnode.running .gnode-inner::after{opacity:1;box-shadow:0 0 0 1px var(--azure-bg), 0 0 28px oklch(0.78 0.14 235 / 0.25)}
+.gnode.done .gnode-inner::after{opacity:1;box-shadow:0 0 0 1px var(--jade-bg), 0 0 18px oklch(0.78 0.14 165 / 0.18)}
+.gnode.failed .gnode-inner{border-color:var(--rose)}
+.gnode.terminus .gnode-inner{background:linear-gradient(135deg, var(--bg-3), var(--bg-2));border-color:var(--amber-bg)}
+
+.gn-icon{
+  width:24px;height:24px;border-radius:50%;
+  background:rgba(255,255,255,.025);
+  display:flex;align-items:center;justify-content:center;
+  border:1px solid var(--line);flex-shrink:0;
+}
+.gn-icon svg{width:12px;height:12px;stroke:var(--ink-2);stroke-width:1.5;fill:none;transition:stroke .3s}
+.gnode.running .gn-icon{background:var(--azure-bg)}
+.gnode.running .gn-icon svg{stroke:var(--azure)}
+.gnode.done .gn-icon{background:var(--jade-bg)}
+.gnode.done .gn-icon svg{stroke:var(--jade)}
+.gnode.failed .gn-icon{background:var(--rose-bg)}
+.gnode.failed .gn-icon svg{stroke:var(--rose)}
+.gnode.terminus .gn-icon{background:var(--amber-bg);border-color:transparent}
+.gnode.terminus .gn-icon svg{stroke:var(--amber)}
+
+.gn-label{font-size:10px;font-weight:700;letter-spacing:.02em;color:var(--ink-0);white-space:nowrap}
+.gn-sub{font-size:7.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);font-family:var(--mono)}
+.gnode.running .gn-sub{color:var(--azure)}
+.gnode.done .gn-sub{color:var(--jade)}
+
+.stage-label{
+  position:absolute;font-size:8px;font-family:var(--mono);
+  letter-spacing:.22em;text-transform:uppercase;color:var(--ink-4);
+  pointer-events:none;white-space:nowrap;
+}
+
+.edge{fill:none;stroke:var(--line-2);stroke-width:1.2;stroke-dasharray:3,4;transition:stroke .4s, stroke-width .3s}
+.edge.flowing{stroke:var(--amber);stroke-width:1.5;stroke-dasharray:6,4;animation:dashflow 1.4s linear infinite}
+.edge.done{stroke:rgba(255,255,255,.10);stroke-dasharray:none}
+
+/* DECISION STRIP */
+#decision-strip{
+  border-top:1px solid var(--line);
+  padding:16px 28px;
+  display:grid;
+  grid-template-columns: minmax(220px,1.2fr) 1fr 1fr 1fr;
+  gap:24px;
+  background:linear-gradient(180deg, transparent, rgba(255,255,255,.008));
+  min-height:120px;align-items:start;
+}
+.dsec{display:flex;flex-direction:column;gap:6px;min-width:0}
+.dsec-label{font-size:9px;font-weight:700;letter-spacing:.20em;text-transform:uppercase;font-family:var(--mono);color:var(--ink-3)}
+.dsec-value{font-size:13px;color:var(--ink-0);line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical}
+.dsec-value.muted{color:var(--ink-2);font-style:italic;font-size:11px}
+.action-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:5px 10px;border-radius:6px;
+  font-size:11px;font-weight:700;letter-spacing:.10em;
+  font-family:var(--mono);text-transform:uppercase;
+  border:1px solid var(--amber);color:var(--amber);background:var(--amber-bg);width:fit-content;
+}
+.action-badge.deploy{border-color:var(--jade);color:var(--jade);background:var(--jade-bg)}
+.action-badge.escalate{border-color:var(--rose);color:var(--rose);background:var(--rose-bg)}
+.dsec-stat{display:flex;align-items:baseline;gap:6px}
+.dsec-num{font-size:24px;font-weight:700;color:var(--ink-0);font-family:var(--mono);letter-spacing:-.02em;line-height:1}
+.dsec-num.warn{color:var(--amber)}
+.dsec-num.bad{color:var(--rose)}
+.dsec-num.good{color:var(--jade)}
+.dsec-unit{font-size:10px;color:var(--ink-3);letter-spacing:.1em;text-transform:uppercase;font-family:var(--mono)}
+.kv-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:11px}
+.kv-row .k{color:var(--ink-3);font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase}
+.kv-row .v{color:var(--ink-0);font-family:var(--mono);font-size:11px}
+.kv-row .v.amber{color:var(--amber)}
+.kv-row .v.jade{color:var(--jade)}
+.kv-row .v.rose{color:var(--rose)}
+
+/* RIGHT — EVENT LOG */
+#log-col{display:flex;flex-direction:column}
+#log-body{
+  flex:1;overflow-y:auto;padding:6px 18px 14px;
+  font-family:var(--mono);font-size:11px;line-height:1.7;
+  scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.08) transparent;
+}
+#log-body::-webkit-scrollbar{width:3px}
+#log-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:2px}
+
+.levt{
+  display:grid;grid-template-columns:56px 1fr;gap:0 12px;
+  padding:6px 0;border-bottom:1px dashed rgba(255,255,255,.03);align-items:baseline;
+}
+.levt:last-child{border-bottom:none}
+.levt-time{color:var(--ink-4);font-size:10px;letter-spacing:.04em}
+.levt-body{display:flex;flex-direction:column;gap:2px;min-width:0}
+.levt-line1{display:flex;align-items:baseline;gap:8px;min-width:0}
+.levt-agent{font-size:10.5px;font-weight:700;letter-spacing:.06em;color:var(--amber);text-transform:uppercase;white-space:nowrap}
+.levt-status{font-size:9px;letter-spacing:.14em;text-transform:uppercase;padding:1px 5px;border-radius:3px;border:1px solid var(--line)}
+.levt-status.running{color:var(--azure);border-color:var(--azure-bg)}
+.levt-status.done{color:var(--jade);border-color:var(--jade-bg)}
+.levt-status.failed{color:var(--rose);border-color:var(--rose-bg)}
+.levt-status.waiting{color:var(--ink-3)}
+.levt-msg{color:var(--ink-1);font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.log-empty{padding:32px 12px;text-align:center;color:var(--ink-3);font-size:11px;font-family:var(--mono);letter-spacing:.08em}
+.log-empty-dots{color:var(--ink-4);font-size:10px;letter-spacing:.2em;display:block;margin-bottom:6px}
+
+/* ANIMATIONS */
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes breathe{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes dashflow{to{stroke-dashoffset:-30}}
+@keyframes fadein{from{opacity:0;transform:translateY(2px)}to{opacity:1;transform:translateY(0)}}
+.fade-in{animation:fadein .25s ease-out}
+</style>
+</head>
+<body>
+<div id="app">
+
+<header>
+  <div class="brand">
+    <div class="brand-mark">
+      <svg viewBox="0 0 20 20" fill="none">
+        <path d="M3 16 L10 4 L17 16" stroke="url(#bgrad)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M6.5 13 L10 7 L13.5 13" stroke="oklch(0.78 0.14 70)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" opacity=".55"/>
+        <circle cx="10" cy="16.4" r="0.9" fill="oklch(0.78 0.14 70)"/>
+        <defs>
+          <linearGradient id="bgrad" x1="0" y1="0" x2="20" y2="20">
+            <stop offset="0" stop-color="oklch(0.78 0.14 70)"/>
+            <stop offset="1" stop-color="oklch(0.78 0.14 165)"/>
+          </linearGradient>
+        </defs>
+      </svg>
+    </div>
+    <div class="brand-text">
+      <div class="brand-name">Auto<em>Pilot</em>&nbsp;CI</div>
+      <div class="brand-sub">Multi-Agent Pipeline · vLLM · MI300X</div>
+    </div>
+  </div>
+
+  <div class="hdr-center">
+    <div class="run-pill" id="run-pill">
+      <div class="pdot"></div>
+      <span class="ptxt" id="run-state">Idle</span>
+      <span class="pid" id="run-id">—</span>
+    </div>
+  </div>
+
+  <div class="hdr-right">
+    <div class="gpu-meter">
+      <span class="gpu-label">GPU</span>
+      <div class="gpu-bar"><div class="gpu-bar-fill" id="gpu-fill"></div></div>
+      <span class="gpu-val" id="gpu-val">0%</span>
+    </div>
+    <button class="btn-trigger" id="btn-trigger" onclick="triggerRun()">
+      <svg viewBox="0 0 10 10" fill="currentColor"><polygon points="1.5,1 9,5 1.5,9"/></svg>
+      Trigger Run
+    </button>
+  </div>
+</header>
+
+<div id="main">
+
+  <section class="col" id="agents">
+    <div class="col-head">
+      <svg viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.4">
+        <circle cx="2.5" cy="3" r="1.4"/><circle cx="8.5" cy="3" r="1.4"/>
+        <circle cx="2.5" cy="8" r="1.4"/><circle cx="8.5" cy="8" r="1.4"/>
+        <line x1="3.9" y1="3" x2="7.1" y2="3"/><line x1="2.5" y1="4.4" x2="2.5" y2="6.6"/>
+        <line x1="8.5" y1="4.4" x2="8.5" y2="6.6"/><line x1="3.9" y1="8" x2="7.1" y2="8"/>
+      </svg>
+      Agent Roster
+      <span class="ch-tag" id="agent-count">7 / 7</span>
+    </div>
+    <div id="agents-list"></div>
+  </section>
+
+  <section class="col" id="center">
+    <div id="graph-wrap">
+      <div class="col-head">
+        <svg viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.4">
+          <circle cx="5.5" cy="2" r="1.2"/><circle cx="2" cy="8" r="1.2"/><circle cx="9" cy="8" r="1.2"/>
+          <line x1="5.5" y1="3.2" x2="2.6" y2="6.8"/><line x1="5.5" y1="3.2" x2="8.4" y2="6.8"/>
+        </svg>
+        Pipeline Topology
+        <span class="ch-tag" id="topo-tag">parallel · asyncio.gather</span>
+      </div>
+      <div id="graph">
+        <svg id="edges" preserveAspectRatio="none"></svg>
+        <div id="nodes"></div>
+      </div>
+    </div>
+
+    <div id="decision-strip">
+      <div class="dsec">
+        <div class="dsec-label">Supervisor Decision</div>
+        <div id="dec-action"><span class="action-badge" style="opacity:.4">PENDING</span></div>
+        <div class="dsec-value muted" id="dec-summary">Awaiting agent results…</div>
+      </div>
+      <div class="dsec">
+        <div class="dsec-label">Security</div>
+        <div class="dsec-stat"><span class="dsec-num" id="sec-bandit">—</span><span class="dsec-unit">bandit</span></div>
+        <div class="kv-row"><span class="k">CVE hits</span><span class="v" id="sec-cve">—</span></div>
+        <div class="kv-row"><span class="k">High</span><span class="v rose" id="sec-high">—</span></div>
+      </div>
+      <div class="dsec">
+        <div class="dsec-label">Code &amp; Perf</div>
+        <div class="dsec-stat"><span class="dsec-num" id="findings-count">—</span><span class="dsec-unit">findings</span></div>
+        <div class="kv-row"><span class="k">Tests written</span><span class="v jade" id="tests-count">—</span></div>
+        <div class="kv-row"><span class="k">Hotspots</span><span class="v amber" id="hotspots">—</span></div>
+      </div>
+      <div class="dsec">
+        <div class="dsec-label">Auto-Fix · Deploy</div>
+        <div class="dsec-stat"><span class="dsec-num" id="fix-count">—</span><span class="dsec-unit">patches</span></div>
+        <div class="kv-row"><span class="k">Branch</span><span class="v" id="fix-branch">—</span></div>
+        <div class="kv-row"><span class="k">Deploy</span><span class="v jade" id="dep-strategy">—</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="col" id="log-col">
+    <div class="col-head">
+      <svg viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.4">
+        <rect x="1" y="1.5" width="9" height="8" rx="1"/>
+        <polyline points="3,4.2 4.6,5.5 3,6.8"/>
+        <line x1="5.6" y1="6.8" x2="8.2" y2="6.8"/>
+      </svg>
+      Event Stream
+      <span class="ch-tag" id="event-count">0 events</span>
+    </div>
+    <div id="log-body">
+      <div class="log-empty">
+        <span class="log-empty-dots">·  ·  ·  ·  ·  ·  ·</span>
+        Awaiting pipeline events
+      </div>
+    </div>
+  </section>
+
+</div>
+</div>
+
+<script>
+/* ─── Agent definitions (trusted constants — SVG icons are static markup) ─── */
+const AGENTS = [
+  { id:'code_analyzer',    name:'Code',       model:'Qwen-Coder-32B', pos:[40,18],
+    iconPath:'<polyline points="5,3.5 1.5,8 5,12.5"/><polyline points="11,3.5 14.5,8 11,12.5"/><line x1="9.5" y1="2" x2="6.5" y2="14"/>' },
+  { id:'test_generator',   name:'Tests',      model:'Qwen-Coder-32B', pos:[40,38],
+    iconPath:'<path d="M5 1.5h6"/><path d="M6.5 1.5v4l-3 7.5a1 1 0 0 0 .9 1.5h7.2a1 1 0 0 0 .9-1.5l-3-7.5v-4"/><line x1="5.4" y1="9" x2="10.6" y2="9"/>' },
+  { id:'security_scanner', name:'Security',   model:'DeepSeek-V2',    pos:[40,58],
+    iconPath:'<path d="M8 1.5L2.5 4v4.5c0 3.5 2.5 5.5 5.5 6.5 3-1 5.5-3 5.5-6.5V4L8 1.5z"/><polyline points="5.5,8 7.3,9.8 10.5,6.5"/>' },
+  { id:'perf_analyzer',    name:'Perf',       model:'Qwen-Coder-32B', pos:[40,78],
+    iconPath:'<polyline points="1.5,12 4.5,8 7,10 11,4.5 14.5,7"/><line x1="1.5" y1="13.5" x2="14.5" y2="13.5" stroke-dasharray="1.5,1.5" stroke-width=".9"/>' },
+  { id:'supervisor',       name:'Supervisor', model:'Qwen2.5-72B',    pos:[68,48],
+    iconPath:'<circle cx="8" cy="8" r="5.5"/><circle cx="8" cy="8" r="2"/><line x1="8" y1="0.8" x2="8" y2="2.5"/><line x1="8" y1="13.5" x2="8" y2="15.2"/><line x1="0.8" y1="8" x2="2.5" y2="8"/><line x1="13.5" y1="8" x2="15.2" y2="8"/>' },
+  { id:'autofix',          name:'Auto-Fix',   model:'Qwen-Coder',     pos:[90,28],
+    iconPath:'<path d="M9 2.5L13.5 7L7 13.5H2.5V9L9 2.5Z"/><line x1="6.5" y1="4" x2="11.5" y2="9"/><line x1="2" y1="14" x2="3.5" y2="12.5"/>' },
+  { id:'deployment',       name:'Deploy',     model:'Llama-3.1-8B',   pos:[90,68],
+    iconPath:'<path d="M8 1.5C10 1.5 12 4 12 7 12 9 11 11 8 14 5 11 4 9 4 7 4 4 6 1.5 8 1.5z"/><circle cx="8" cy="6.5" r="1.5"/><path d="M5 14.5h6"/>' },
+];
+
+const EDGES = [
+  {from:'src',to:'code_analyzer'},{from:'src',to:'test_generator'},
+  {from:'src',to:'security_scanner'},{from:'src',to:'perf_analyzer'},
+  {from:'code_analyzer',to:'supervisor'},{from:'test_generator',to:'supervisor'},
+  {from:'security_scanner',to:'supervisor'},{from:'perf_analyzer',to:'supervisor'},
+  {from:'supervisor',to:'autofix'},{from:'supervisor',to:'deployment'},
+];
+
+const STAGES = [{x:12,y:92,text:'TRIGGER'},{x:40,y:92,text:'PARALLEL · 4×'},{x:68,y:92,text:'AGGREGATE'},{x:90,y:92,text:'ACT'}];
+
+/* ─── State ─── */
+const state = { runId:null, running:false, agentStatus:{}, agentResult:{}, events:[], decision:null, gpuPct:0 };
+AGENTS.forEach(a => state.agentStatus[a.id] = 'waiting');
+
+function $id(id){ return document.getElementById(id); }
+
+/* ─── SVG icon builder (from trusted constant iconPath strings) ─── */
+function makeIconSvg(iconPath){
+  const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('viewBox','0 0 16 16');
+  svg.setAttribute('fill','none');
+  svg.setAttribute('stroke','currentColor');
+  /* Safe: iconPath comes from AGENTS constant defined in this file, not from any external source */
+  svg.innerHTML = iconPath;
+  return svg;
+}
+
+/* ─── Agent cards (DOM construction for text, static SVG for icon) ─── */
+function renderAgents(){
+  const list = $id('agents-list');
+  list.replaceChildren();
+
+  AGENTS.forEach(a => {
+    const st = state.agentStatus[a.id] || 'waiting';
+    const r = state.agentResult[a.id];
+    let msg = a.model;
+    if (r){
+      if (a.id==='security_scanner') msg = 'bandit ' + r.bandit_score + ' · ' + (r.cve_hits||[]).length + ' CVE';
+      else if (a.id==='autofix') msg = r.fixes_applied + ' patches · ' + (r.branch_name||'no branch');
+      else if (a.id==='deployment') msg = String(r.strategy||'');
+      else if (a.id==='supervisor') msg = (r.action||'') + ' · conf ' + (r.confidence||'');
+      else if (r.findings) msg = r.findings.length + ' findings';
+      else if (r.tests_written != null) msg = r.tests_written + ' tests';
+    }
+
+    const card = document.createElement('div');
+    card.className = 'acard ' + st;
+    card.dataset.id = a.id;
+
+    const iconWrap = document.createElement('div');
+    iconWrap.className = 'acard-icon';
+    iconWrap.appendChild(makeIconSvg(a.iconPath));
+
+    const body = document.createElement('div');
+    body.className = 'acard-body';
+    const nameEl = document.createElement('div');
+    nameEl.className = 'acard-name';
+    nameEl.textContent = a.name;
+    const msgEl = document.createElement('div');
+    msgEl.className = 'acard-msg';
+    msgEl.textContent = msg;
+    body.append(nameEl, msgEl);
+
+    const statusWrap = document.createElement('div');
+    statusWrap.className = 'acard-status';
+    const stxt = document.createElement('div');
+    stxt.className = 'acard-stxt';
+    stxt.textContent = st === 'waiting' ? 'Idle' : st;
+    const spinner = document.createElement('div');
+    spinner.className = 'acard-spinner';
+    const check = document.createElement('div');
+    check.className = 'acard-check';
+    const checkSvg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+    checkSvg.setAttribute('viewBox','0 0 13 13');
+    const poly = document.createElementNS('http://www.w3.org/2000/svg','polyline');
+    poly.setAttribute('points','2.5,6.5 5.5,9.5 10.5,4');
+    checkSvg.appendChild(poly);
+    check.appendChild(checkSvg);
+    statusWrap.append(stxt, spinner, check);
+
+    card.append(iconWrap, body, statusWrap);
+    list.appendChild(card);
+  });
+}
+
+/* ─── Graph nodes (from trusted constants) ─── */
+function renderGraph(){
+  const nodesEl = $id('nodes');
+  nodesEl.replaceChildren();
+
+  // Source terminus node
+  const srcEl = makeGraphNode('src', 'terminus', {pos:[12,48], label:'push', sub:'webhook',
+    iconPath:'<circle cx="3" cy="3" r="1.4"/><circle cx="3" cy="9" r="1.4"/><circle cx="9" cy="6" r="1.4"/><path d="M3 4.4 V 7.6"/><path d="M3 9 Q 6 9 7.7 6.6"/>',
+    viewBox:'0 0 12 12'});
+  nodesEl.appendChild(srcEl);
+
+  // Agent nodes
+  AGENTS.forEach(a => {
+    const st = state.agentStatus[a.id] || 'waiting';
+    const el = makeGraphNode(a.id, st, {pos:a.pos, label:a.name, sub:st==='waiting'?'idle':st, iconPath:a.iconPath});
+    nodesEl.appendChild(el);
+  });
+
+  // Stage labels
+  STAGES.forEach(s => {
+    const lbl = document.createElement('div');
+    lbl.className = 'stage-label';
+    lbl.style.cssText = 'left:' + s.x + '%;bottom:6px;transform:translateX(-50%)';
+    lbl.textContent = s.text;
+    nodesEl.appendChild(lbl);
+  });
+
+  drawEdges();
+}
+
+function makeGraphNode(id, stClass, opts){
+  const wrap = document.createElement('div');
+  wrap.className = 'gnode ' + stClass;
+  wrap.id = 'gn-' + id;
+  wrap.style.cssText = 'left:' + opts.pos[0] + '%;top:' + opts.pos[1] + '%';
+
+  const inner = document.createElement('div');
+  inner.className = 'gnode-inner';
+
+  const iconWrap = document.createElement('div');
+  iconWrap.className = 'gn-icon';
+  const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('viewBox', opts.viewBox || '0 0 16 16');
+  svg.setAttribute('fill','none');
+  svg.setAttribute('stroke','currentColor');
+  svg.setAttribute('stroke-width','1.5');
+  svg.innerHTML = opts.iconPath;
+  iconWrap.appendChild(svg);
+
+  const labelEl = document.createElement('div');
+  labelEl.className = 'gn-label';
+  labelEl.textContent = opts.label;
+
+  const subEl = document.createElement('div');
+  subEl.className = 'gn-sub';
+  subEl.textContent = opts.sub;
+
+  const textWrap = document.createElement('div');
+  textWrap.style.cssText = 'display:flex;flex-direction:column;gap:1px';
+  textWrap.append(labelEl, subEl);
+
+  inner.append(iconWrap, textWrap);
+  wrap.appendChild(inner);
+  return wrap;
+}
+
+/* ─── SVG edge drawing (all computed geometry — no external data) ─── */
+function drawEdges(){
+  const svgEl = $id('edges');
+  const graph = $id('graph');
+  const rect = graph.getBoundingClientRect();
+  svgEl.setAttribute('viewBox', '0 0 ' + rect.width + ' ' + rect.height);
+
+  while (svgEl.firstChild) svgEl.removeChild(svgEl.firstChild);
+
+  function center(nodeId){
+    const el = $id('gn-' + nodeId);
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return { x:r.left+r.width/2-rect.left, y:r.top+r.height/2-rect.top, w:r.width, h:r.height };
+  }
+
+  EDGES.forEach((e, i) => {
+    const a = center(e.from), b = center(e.to);
+    if (!a || !b) return;
+    const x1 = a.x + a.w/2 - 4, y1 = a.y;
+    const x2 = b.x - b.w/2 + 4, y2 = b.y;
+    const cx = x1 + (x2-x1)*0.5;
+    const d = 'M ' + x1 + ' ' + y1 + ' C ' + cx + ' ' + y1 + ', ' + cx + ' ' + y2 + ', ' + x2 + ' ' + y2;
+
+    const tgtSt = state.agentStatus[e.to];
+    const srcLive = e.from==='src' && state.running;
+    let cls = 'edge';
+    if (tgtSt==='running') cls += ' flowing';
+    else if (tgtSt==='done') cls += ' done';
+    else if (srcLive && tgtSt==='waiting') cls += ' flowing';
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('class', cls);
+    path.setAttribute('d', d);
+    path.setAttribute('id', 'edge-' + i);
+    svgEl.appendChild(path);
+  });
+}
+
+window.addEventListener('resize', () => drawEdges());
+
+/* ─── Event log (DOM construction — all text set via textContent) ─── */
+function renderLog(){
+  const body = $id('log-body');
+  $id('event-count').textContent = state.events.length + ' events';
+
+  if (!state.events.length){
+    body.replaceChildren();
+    const empty = document.createElement('div');
+    empty.className = 'log-empty';
+    const dots = document.createElement('span');
+    dots.className = 'log-empty-dots';
+    dots.textContent = '·  ·  ·  ·  ·  ·  ·';
+    const txt = document.createTextNode(' Awaiting pipeline events');
+    empty.append(dots, txt);
+    body.appendChild(empty);
+    return;
+  }
+
+  const wasBottom = body.scrollHeight - body.scrollTop <= body.clientHeight + 50;
+  body.replaceChildren();
+
+  state.events.forEach(e => {
+    const ts = e.timestamp ? e.timestamp.slice(11,19) : '--:--:--';
+    const row = document.createElement('div');
+    row.className = 'levt fade-in';
+
+    const timeEl = document.createElement('div');
+    timeEl.className = 'levt-time';
+    timeEl.textContent = ts;
+
+    const bodyEl = document.createElement('div');
+    bodyEl.className = 'levt-body';
+
+    const line1 = document.createElement('div');
+    line1.className = 'levt-line1';
+
+    const agentEl = document.createElement('span');
+    agentEl.className = 'levt-agent';
+    agentEl.textContent = e.agent;
+
+    const statusEl = document.createElement('span');
+    statusEl.className = 'levt-status ' + (e.status || '');
+    statusEl.textContent = e.status;
+
+    line1.append(agentEl, statusEl);
+
+    const msgEl = document.createElement('div');
+    msgEl.className = 'levt-msg';
+    msgEl.textContent = e.message;
+
+    bodyEl.append(line1, msgEl);
+    row.append(timeEl, bodyEl);
+    body.appendChild(row);
+  });
+
+  if (wasBottom) body.scrollTop = body.scrollHeight;
+}
+
+/* ─── Decision strip ─── */
+function renderDecision(){
+  const d = state.decision;
+  const elAction = $id('dec-action');
+  const elSummary = $id('dec-summary');
+
+  elAction.replaceChildren();
+  if (!d){
+    const badge = document.createElement('span');
+    badge.className = 'action-badge';
+    badge.style.opacity = '0.4';
+    badge.textContent = 'PENDING';
+    elAction.appendChild(badge);
+    elSummary.className = 'dsec-value muted';
+    elSummary.textContent = 'Awaiting agent results…';
+  } else {
+    const badge = document.createElement('span');
+    badge.className = 'action-badge' + (d.action==='DEPLOY' ? ' deploy' : d.action==='ESCALATE' ? ' escalate' : '');
+    badge.textContent = d.action;
+    elAction.appendChild(badge);
+    elSummary.className = 'dsec-value';
+    elSummary.textContent = d.summary;
+  }
+
+  const sec = state.agentResult.security_scanner;
+  $id('sec-bandit').textContent = sec ? sec.bandit_score : '—';
+  $id('sec-bandit').className = 'dsec-num' + (sec && sec.bandit_score>5 ? ' bad' : sec && sec.bandit_score>0 ? ' warn' : '');
+  $id('sec-cve').textContent = sec ? (sec.cve_hits||[]).length : '—';
+  $id('sec-high').textContent = sec ? (sec.cve_hits||[]).filter(c => /high|critical/i.test(c)).length : '—';
+
+  const code = state.agentResult.code_analyzer;
+  const perf = state.agentResult.perf_analyzer;
+  const test = state.agentResult.test_generator;
+  const fcount = (code?.findings?.length||0) + (perf?.findings?.length||0);
+  $id('findings-count').textContent = (code||perf) ? fcount : '—';
+  $id('findings-count').className = 'dsec-num' + (fcount>3 ? ' warn' : (code||perf) && fcount===0 ? ' good' : '');
+  $id('tests-count').textContent = test ? test.tests_written : '—';
+  $id('hotspots').textContent = perf ? (perf.findings||[]).length : '—';
+
+  const fix = state.agentResult.autofix;
+  const dep = state.agentResult.deployment;
+  $id('fix-count').textContent = fix ? fix.fixes_applied : '—';
+  $id('fix-count').className = 'dsec-num' + (fix && fix.fixes_applied>0 ? ' good' : '');
+  $id('fix-branch').textContent = fix?.branch_name || '—';
+  $id('dep-strategy').textContent = dep?.strategy || '—';
+}
+
+/* ─── GPU ─── */
+function setGpu(pct){
+  state.gpuPct = pct;
+  $id('gpu-fill').style.width = pct + '%';
+  $id('gpu-val').textContent = pct + '%';
+}
+
+/* ─── Run pill ─── */
+function setRunPill(stClass, text, runId){
+  const pill = $id('run-pill');
+  pill.className = 'run-pill' + (stClass ? ' '+stClass : '');
+  $id('run-state').textContent = text;
+  $id('run-id').textContent = runId ? String(runId).slice(0,8) : '—';
+}
+
+/* ─── Agent state update ─── */
+function setAgent(id, status, result){
+  state.agentStatus[id] = status;
+  if (result) state.agentResult[id] = result;
+  const node = $id('gn-'+id);
+  if (node){
+    node.classList.remove('waiting','running','done','failed');
+    node.classList.add(status);
+    const sub = node.querySelector('.gn-sub');
+    if (sub) sub.textContent = status==='waiting'?'idle':status;
+  }
+  renderAgents();
+  drawEdges();
+  renderDecision();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MOCK PIPELINE
+═══════════════════════════════════════════════════════════════ */
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function pushEvent(agent, status, message){
+  state.events.push({ timestamp: new Date().toISOString(), agent, status, message });
+  renderLog();
+}
+
+async function mockGpuRamp(target, dur){
+  const start = state.gpuPct, t0 = performance.now();
+  return new Promise(res => {
+    function step(){
+      const t = (performance.now()-t0)/dur;
+      if (t>=1){ setGpu(target); return res(); }
+      setGpu(Math.round(start + (target-start)*(1-Math.pow(1-t,3))));
+      requestAnimationFrame(step);
+    }
+    step();
+  });
+}
+
+async function runMockPipeline(){
+  if (state.running) return;
+  state.running = true; state.runId = 'run_' + Math.random().toString(36).slice(2,10);
+  state.events = []; state.decision = null; state.agentResult = {};
+  AGENTS.forEach(a => state.agentStatus[a.id] = 'waiting');
+  renderAgents(); renderGraph(); renderLog(); renderDecision();
+  $id('btn-trigger').disabled = true;
+  setRunPill('live','Running',state.runId);
+
+  pushEvent('webhook','done','POST /webhook · ' + state.runId);
+  pushEvent('runner','running','Computing diff for HEAD…');
+  await sleep(450);
+  pushEvent('runner','done','3 .py files changed (app.py, utils.py, queries.py)');
+  await sleep(250);
+
+  ['code_analyzer','test_generator','security_scanner','perf_analyzer'].forEach(id => {
+    setAgent(id,'running'); pushEvent(id,'running','Loading model on MI300X HBM3…');
+  });
+  mockGpuRamp(94, 1400);
+
+  const steps = [
+    {id:'test_generator',    delay:1400, msg:'Generated 8 tests · +12% coverage',          result:{tests_written:8, coverage_delta:'+12%'}},
+    {id:'code_analyzer',     delay:2100, msg:'3 findings: complexity, naming, dead_code',   result:{findings:[{file:'app.py',line:42,category:'complexity'},{file:'utils.py',line:18,category:'naming'},{file:'queries.py',line:7,category:'dead_code'}]}},
+    {id:'perf_analyzer',     delay:2600, msg:'2 hotspots: O(n²) loop · N+1 query',         result:{findings:[{file:'app.py',line:124,category:'O(n²)'},{file:'queries.py',line:33,category:'N+1'}]}},
+    {id:'security_scanner',  delay:3300, msg:'bandit 7 · CVE-2018-18074 (requests<2.20)',  result:{bandit_score:7, cve_hits:['CVE-2018-18074 (high)','CVE-2023-32681 (medium)']}},
+  ];
+  let prev = 0;
+  for (const s of steps){ await sleep(s.delay-prev); prev=s.delay; setAgent(s.id,'done',s.result); pushEvent(s.id,'done',s.msg); }
+  mockGpuRamp(72,600);
+
+  await sleep(400);
+  setAgent('supervisor','running');
+  pushEvent('supervisor','running','Aggregating · weighing severity vs auto-fixability');
+  await sleep(1200);
+  const decision = {action:'AUTO_FIX', summary:'2 high-severity issues are deterministically fixable. Opening branch + PR; not deploying until reviewed.', confidence:0.86};
+  state.decision = decision;
+  setAgent('supervisor','done',decision);
+  pushEvent('supervisor','done','decision: AUTO_FIX (conf 0.86)');
+
+  setAgent('autofix','running');
+  pushEvent('autofix','running','str.replace patches · creating branch');
+  await sleep(1200);
+  setAgent('autofix','done',{fixes_applied:4, branch_name:'autopilot/fix-cve-perf-3a8', pr_url:'https://github.com/org/repo/pull/142'});
+  pushEvent('autofix','done','4 patches applied · PR #142 opened');
+  setAgent('deployment','waiting',{strategy:'awaiting review'});
+  pushEvent('deployment','waiting','Held — DEPLOY blocked until PR merged');
+
+  await sleep(400);
+  mockGpuRamp(8,800);
+  setRunPill('done','Complete',state.runId);
+  $id('btn-trigger').disabled = false;
+  state.running = false;
+  drawEdges();
+}
+
+window.triggerRun = function(){ runMockPipeline(); };
+
+/* ═══════════════════════════════════════════════════════════════
+   REAL BACKEND INTEGRATION
+   Detects /health and switches to live polling mode.
+═══════════════════════════════════════════════════════════════ */
+let _pollTimer = null;
+
+async function tryRealBackend(){
+  try {
+    const r = await fetch('/health', {cache:'no-store'});
+    if (!r.ok) return;
+
+    window.triggerRun = async function(){
+      if (state.running) return;
+      state.running = true;
+      state.events = []; state.decision = null; state.agentResult = {};
+      AGENTS.forEach(a => state.agentStatus[a.id] = 'waiting');
+      renderAgents(); renderGraph(); renderLog(); renderDecision();
+      $id('btn-trigger').disabled = true;
+
+      try {
+        const resp = await fetch('/trigger', {method:'POST'});
+        if (!resp.ok) throw new Error('/trigger ' + resp.status);
+        const data = await resp.json();
+        state.runId = data.run_id;
+        setRunPill('live','Running',state.runId);
+        if (_pollTimer) clearInterval(_pollTimer);
+        _pollTimer = setInterval(pollBackend, 1500);
+      } catch(e){
+        console.error('Trigger failed:', e);
+        state.running = false;
+        $id('btn-trigger').disabled = false;
+        setRunPill('','Error',null);
+      }
+    };
+  } catch(e){ /* mock mode */ }
+}
+
+async function pollBackend(){
+  if (!state.runId) return;
+  try {
+    const [sr, er, gr] = await Promise.all([
+      fetch('/status/' + state.runId),
+      fetch('/events/' + state.runId),
+      fetch('/gpu'),
+    ]);
+    if (sr.ok){
+      const run = await sr.json();
+      const agentMap = {
+        code_analyzer:'code_result', test_generator:'test_result',
+        security_scanner:'security_result', perf_analyzer:'perf_result',
+        autofix:'autofix_result', deployment:'deployment_result',
+      };
+      for (const [agentId, field] of Object.entries(agentMap)){
+        const result = run[field];
+        if (result) setAgent(agentId, result.status || 'done', result);
+      }
+      if (run.supervisor_decision){ state.decision = run.supervisor_decision; setAgent('supervisor','done',run.supervisor_decision); }
+      if (run.status==='done'||run.status==='failed'){
+        clearInterval(_pollTimer); _pollTimer = null;
+        state.running = false;
+        $id('btn-trigger').disabled = false;
+        setRunPill(run.status==='done'?'done':'', run.status==='done'?'Complete':'Failed', state.runId);
+        mockGpuRamp(8, 800);
+      }
+    }
+    if (er.ok){ const evs = await er.json(); if (evs.length!==state.events.length){ state.events=evs; renderLog(); } }
+    if (gr.ok){ const g = await gr.json(); const m = String(g.util||'').match(/(\d+)/); if (m) setGpu(parseInt(m[1],10)); }
+  } catch(e){ /* transient */ }
+}
+
+/* ─── Boot ─── */
+function boot(){
+  renderAgents(); renderGraph(); renderLog(); renderDecision();
+  setGpu(0); setRunPill('','Idle',null);
+  requestAnimationFrame(() => requestAnimationFrame(drawEdges));
+  tryRealBackend();
+}
+boot();
+</script>
+</body>
+</html>

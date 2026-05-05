@@ -262,61 +262,194 @@ def _build_final_report(run_data: dict) -> str:
     return "\n\n---\n\n".join(sections) if sections else "No findings. All clear! ✅"
 
 
+# ─── Custom CSS (AMD theme) ────────────────────────────────────────────────────
+
+_CSS = """
+/* ── Global ── */
+body, .gradio-container {
+    background: #0d0d0d !important;
+    color: #f0f0f0 !important;
+    font-family: 'Inter', 'Segoe UI', sans-serif !important;
+}
+
+/* ── Header banner ── */
+#header-banner {
+    background: linear-gradient(135deg, #1a0000 0%, #2d0000 50%, #1a0000 100%);
+    border: 1px solid #E31837;
+    border-radius: 12px;
+    padding: 20px 28px;
+    margin-bottom: 4px;
+}
+#header-banner h1 { color: #E31837 !important; font-size: 2rem !important; margin: 0 0 4px 0 !important; }
+#header-banner p  { color: #aaa !important; margin: 0 !important; font-size: 0.95rem !important; }
+
+/* ── Trigger button ── */
+#trigger-btn {
+    background: #E31837 !important;
+    border: none !important;
+    color: #fff !important;
+    font-weight: 700 !important;
+    font-size: 1rem !important;
+    border-radius: 8px !important;
+    padding: 12px 28px !important;
+    transition: background 0.2s !important;
+}
+#trigger-btn:hover { background: #b0122a !important; }
+
+/* ── Status box ── */
+#status-box textarea {
+    background: #1a1a1a !important;
+    border: 1px solid #333 !important;
+    color: #4ade80 !important;
+    font-family: monospace !important;
+    font-size: 0.85rem !important;
+    border-radius: 8px !important;
+}
+
+/* ── Section headers ── */
+.section-header {
+    color: #E31837 !important;
+    font-size: 0.75rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.1em !important;
+    border-bottom: 1px solid #2a2a2a !important;
+    padding-bottom: 6px !important;
+    margin-bottom: 12px !important;
+}
+
+/* ── Agent grid markdown ── */
+#agent-grid {
+    background: #111 !important;
+    border: 1px solid #222 !important;
+    border-radius: 10px !important;
+    padding: 14px !important;
+    min-height: 340px !important;
+}
+#agent-grid p    { margin: 0 0 10px 0 !important; line-height: 1.6 !important; }
+#agent-grid strong { color: #e0e0e0 !important; }
+
+/* ── Event log ── */
+#event-log textarea {
+    background: #0a0a0a !important;
+    border: 1px solid #222 !important;
+    color: #7dd3a8 !important;
+    font-family: 'Cascadia Code', 'Consolas', monospace !important;
+    font-size: 0.78rem !important;
+    border-radius: 10px !important;
+    line-height: 1.6 !important;
+}
+
+/* ── GPU box ── */
+#gpu-box {
+    background: #111 !important;
+    border: 1px solid #E31837 !important;
+    border-radius: 8px !important;
+}
+#gpu-box textarea {
+    background: transparent !important;
+    color: #E31837 !important;
+    font-family: monospace !important;
+    font-weight: 600 !important;
+}
+#gpu-box label { color: #E31837 !important; font-weight: 700 !important; }
+
+/* ── Final report accordion ── */
+#report-accordion {
+    background: #111 !important;
+    border: 1px solid #333 !important;
+    border-radius: 10px !important;
+    margin-top: 8px !important;
+}
+#report-accordion .label-wrap { color: #E31837 !important; font-weight: 700 !important; }
+
+/* ── Accordion inner markdown ── */
+#report-md { padding: 12px !important; }
+#report-md h3 { color: #E31837 !important; }
+#report-md code { background: #1e1e1e !important; color: #7dd3a8 !important; }
+
+/* ── Hide Gradio footer ── */
+footer { display: none !important; }
+"""
+
+_HEADER_HTML = """
+<div id="header-banner">
+  <h1>🚀 AutoPilot CI</h1>
+  <p>Multi-agent CI/CD system &nbsp;·&nbsp; AMD MI300X + vLLM &nbsp;·&nbsp;
+     4 LLMs running in parallel &nbsp;·&nbsp; AMD Hackathon 2026</p>
+</div>
+"""
+
+
 # ─── Gradio app ────────────────────────────────────────────────────────────────
 
 def build_app() -> gr.Blocks:
     """Build and return the Gradio Blocks app."""
     with gr.Blocks(
-        title="AutoPilot CI — AMD MI300X Dashboard",
-        theme=gr.themes.Base(),
+        title="AutoPilot CI — AMD MI300X",
+        theme=gr.themes.Base(
+            primary_hue="red",
+            neutral_hue="slate",
+        ),
+        css=_CSS,
     ) as demo:
-        gr.Markdown(
-            "# 🚀 AutoPilot CI\n"
-            "**Multi-agent CI/CD system powered by AMD MI300X + vLLM**\n\n"
-            "Click **Trigger Demo Run** to push the seeded sample repo through "
-            "all 4 analysis agents running in parallel."
-        )
+
+        gr.HTML(_HEADER_HTML)
 
         with gr.Row():
-            trigger_btn = gr.Button("▶ Trigger Demo Run", variant="primary", scale=2)
-            trigger_status = gr.Textbox(label="Status", scale=3, interactive=False)
+            trigger_btn = gr.Button(
+                "▶  Trigger Demo Run",
+                variant="primary",
+                scale=1,
+                elem_id="trigger-btn",
+            )
+            trigger_status = gr.Textbox(
+                label="Pipeline Status",
+                scale=3,
+                interactive=False,
+                elem_id="status-box",
+            )
 
-        with gr.Row():
+        with gr.Row(equal_height=True):
             with gr.Column(scale=2):
-                gr.Markdown("### 🤖 Agent Status")
+                gr.HTML('<div class="section-header">🤖 Agent Status</div>')
                 agent_grid = gr.Markdown(
                     "\n\n".join(
                         f"**{name}**  ⚪ Waiting\n—" for name in AGENT_NAMES
-                    )
+                    ),
+                    elem_id="agent-grid",
                 )
 
             with gr.Column(scale=3):
-                gr.Markdown("### 📋 Live Event Log")
+                gr.HTML('<div class="section-header">📋 Live Event Log</div>')
                 event_log_box = gr.Textbox(
                     label="",
-                    lines=18,
-                    max_lines=18,
+                    lines=16,
+                    max_lines=16,
                     interactive=False,
-                    placeholder="Events will appear here after triggering a run...",
+                    placeholder="── waiting for pipeline events ──",
+                    elem_id="event-log",
                 )
 
         with gr.Row():
             gpu_box = gr.Textbox(
-                label="🔴 AMD GPU Utilization (rocm-smi)",
-                value="N/A (mock mode)",
+                label="⬛ AMD GPU Utilization  (rocm-smi --showuse)",
+                value="N/A (mock mode — set mock: false + AMD MI300X for live data)",
                 interactive=False,
+                elem_id="gpu-box",
             )
 
-        with gr.Accordion("📊 Final Report", open=True, visible=False) as report_accordion:
-            report_md = gr.Markdown("")
+        with gr.Accordion(
+            "📊  Final Report",
+            open=False,
+            visible=False,
+            elem_id="report-accordion",
+        ) as report_accordion:
+            report_md = gr.Markdown("", elem_id="report-md")
 
-        # Wire up callbacks
-        trigger_btn.click(
-            fn=trigger_demo_run,
-            outputs=trigger_status,
-        )
+        # ── Callbacks ──
+        trigger_btn.click(fn=trigger_demo_run, outputs=trigger_status)
 
-        # Auto-refresh every 2s (gr.Timer unavailable in gradio<4.37, use demo.load)
         demo.load(
             fn=refresh_dashboard,
             outputs=[agent_grid, event_log_box, gpu_box, report_accordion, report_md],
