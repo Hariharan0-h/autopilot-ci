@@ -22,6 +22,12 @@ from dotenv import load_dotenv
 from openai import AsyncOpenAI, APIError
 from rich.console import Console
 
+try:
+    import anthropic as _anthropic_sdk
+    _ANTHROPIC_AVAILABLE = True
+except ImportError:
+    _ANTHROPIC_AVAILABLE = False
+
 load_dotenv()
 console = Console()
 
@@ -135,6 +141,22 @@ MOCK_RESPONSES: dict[str, str] = {
 }
 
 
+# ─── Provider detection ────────────────────────────────────────────────────────
+
+# Claude model to use per role when Anthropic API is the provider
+_ANTHROPIC_MODELS: dict[str, str] = {
+    "supervisor": "claude-sonnet-4-5",
+    "coder":      "claude-sonnet-4-5",
+    "security":   "claude-sonnet-4-5",
+    "perf":       "claude-sonnet-4-5",
+    "deploy":     "claude-haiku-4-5-20251001",
+}
+
+def _use_anthropic() -> bool:
+    """True when ANTHROPIC_API_KEY is set and VLLM_BASE_URL is not."""
+    return bool(os.getenv("ANTHROPIC_API_KEY")) and not os.getenv("VLLM_BASE_URL")
+
+
 # ─── OpenAI client factory ─────────────────────────────────────────────────────
 
 def _make_client(endpoint: str) -> AsyncOpenAI:
@@ -144,6 +166,35 @@ def _make_client(endpoint: str) -> AsyncOpenAI:
         api_key=os.getenv("VLLM_API_KEY", "not-required"),
         timeout=120.0,
     )
+
+
+async def _anthropic_call(
+    model_name: str,
+    system_prompt: str,
+    user_prompt: str,
+    temperature: float,
+    max_tokens: int,
+) -> str:
+    """Make a call via the Anthropic SDK."""
+    if not _ANTHROPIC_AVAILABLE:
+        raise ImportError("anthropic package not installed. Run: pip install anthropic")
+    client = _anthropic_sdk.AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+    model_id = _ANTHROPIC_MODELS.get(model_name, "claude-sonnet-4-5")
+    t0 = time.monotonic()
+    response = await client.messages.create(
+        model=model_id,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        system=system_prompt,
+        messages=[{"role": "user", "content": user_prompt}],
+    )
+    elapsed = time.monotonic() - t0
+    usage = response.usage
+    console.print(
+        f"[dim][Anthropic] {model_name} ({model_id}) | "
+        f"in={usage.input_tokens} out={usage.output_tokens} tok | {elapsed:.1f}s[/dim]"
+    )
+    return response.content[0].text if response.content else ""
 
 
 # ─── Core call functions ───────────────────────────────────────────────────────
@@ -177,6 +228,25 @@ async def llm_call(
         await asyncio.sleep(0.1)
         return mock_text
 
+    # ── Anthropic API path (Railway / cloud) ──────────────────────────────────
+    if _use_anthropic():
+        for attempt in range(1, 4):
+            try:
+                return await _anthropic_call(
+                    model_name, system_prompt, user_prompt, temperature, max_tokens
+                )
+            except Exception as e:
+                if attempt == 3:
+                    raise
+                wait = 2 ** attempt
+                console.print(
+                    f"[yellow][Anthropic] {model_name} attempt {attempt} failed "
+                    f"({e}), retrying in {wait}s...[/yellow]"
+                )
+                await asyncio.sleep(wait)
+        return ""
+
+    # ── vLLM path (local / AMD GPU) ───────────────────────────────────────────
     cfg = get_model_config(model_name)
     client = _make_client(cfg["endpoint"])
     model_id = cfg["model"]
