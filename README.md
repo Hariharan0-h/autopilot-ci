@@ -65,8 +65,9 @@ make demo
 # Click "Trigger Demo Run"
 ```
 
-The demo runs in **mock mode** (no GPU required). All 4 analysis agents run with
+The demo runs in **mock mode** (no GPU, no API key required). All 4 analysis agents run with
 hardcoded realistic responses, so you can see the full pipeline flow on any laptop.
+To use a real LLM, copy `.env.example` → `.env` and set `VLLM_API_KEY` (free Groq key at https://console.groq.com).
 
 ---
 
@@ -81,10 +82,23 @@ cd autopilot-ci
 # Install dependencies
 pip install -r requirements.txt
 
+# Set up environment — copy template and fill in your Groq API key
+copy .env.example .env
+# Edit .env:
+#   VLLM_BASE_URL=https://api.groq.com/openai/v1
+#   VLLM_API_KEY=gsk_your_key_here    ← free key at https://console.groq.com
+
+# Load .env into your shell (PowerShell)
+Get-Content .env | ForEach-Object {
+  if ($_ -match '^([^#=][^=]*)=(.+)') {
+    [System.Environment]::SetEnvironmentVariable($Matches[1].Trim(), $Matches[2].Trim())
+  }
+}
+
 # Seed the demo repo with intentional bugs + start everything
 make demo
 
-# Run this cmd
+# Run the server
 uvicorn server.webhook:app --port 8001 --reload
 
 # Open the dashboard

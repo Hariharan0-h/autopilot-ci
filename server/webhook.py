@@ -13,6 +13,7 @@ Endpoints:
 """
 from __future__ import annotations
 import asyncio
+import os
 import shutil
 import subprocess
 import uuid
@@ -32,6 +33,22 @@ _DASHBOARD_DIR = Path(__file__).parent.parent / "dashboard"
 _DEMO_REPO = Path(__file__).parent.parent / "demo" / "sample_repo"
 
 app = FastAPI(title="AutoPilot CI", version="1.0.0")
+
+
+@app.on_event("startup")
+async def check_llm_config() -> None:
+    force_mock = os.getenv("FORCE_MOCK", "").lower() == "true"
+    has_vllm = bool(os.getenv("VLLM_BASE_URL"))
+    has_anthropic = bool(os.getenv("ANTHROPIC_API_KEY"))
+    if not force_mock and not has_vllm and not has_anthropic:
+        print(
+            "\n⚠️  WARNING: No LLM configured — LLM calls will fail and fall back to deterministic logic.\n"
+            "   Fix: copy .env.example to .env and set your Groq API key:\n"
+            "     VLLM_BASE_URL=https://api.groq.com/openai/v1\n"
+            "     VLLM_API_KEY=gsk_...   (free key at console.groq.com)\n"
+            "   Or set FORCE_MOCK=true to run fully without an LLM.\n"
+        )
+
 
 app.add_middleware(
     CORSMiddleware,
