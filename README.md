@@ -5,6 +5,7 @@
 > Built for the **AMD Developer Cloud** using MI300X + vLLM.
 
 ---
+**Demo Url:** https://autopilot-ai.up.railway.app/
 
 ## Architecture
 
