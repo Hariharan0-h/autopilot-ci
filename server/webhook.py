@@ -273,30 +273,51 @@ async def submit_project(
     Returns:
         Dict with run_id, status, and the staging path the repo was copied to.
     """
-    src = Path(body.path)
-    if not src.exists():
-        raise HTTPException(status_code=400, detail=f"Path not found: {body.path}")
-
     run_id = str(uuid.uuid4())
     dest = _REPO_STAGING / run_id
     dest.mkdir(parents=True, exist_ok=True)
 
-    # git clone --local preserves .git so branch/commit refs resolve correctly.
-    # Works identically for GitHub, GitLab, Bitbucket, or any local bare repo.
-    clone = subprocess.run(
-        ["git", "clone", "--local", "--no-hardlinks", str(src), str(dest)],
-        capture_output=True, text=True,
-    )
-    if clone.returncode != 0:
-        # No git repo (bare folder) — fall back to plain file copy
-        shutil.copytree(
-            str(src), str(dest),
-            dirs_exist_ok=True,
-            ignore=shutil.ignore_patterns(
-                ".git", "node_modules", "__pycache__", "*.pyc",
-                "bin", "obj", ".vs", ".idea", "dist", "build",
-            ),
+    is_url = body.path.startswith(("https://", "http://", "git@"))
+
+    if is_url:
+        clone_url = body.path
+        # Inject token into HTTPS URL for private repos
+        github_token = os.getenv("GITHUB_TOKEN", "")
+        if github_token and clone_url.startswith("https://github.com/"):
+            clone_url = clone_url.replace(
+                "https://github.com/",
+                f"https://{github_token}@github.com/",
+            )
+        clone = subprocess.run(
+            ["git", "clone", "--depth", "50", clone_url, str(dest)],
+            capture_output=True, text=True,
         )
+        if clone.returncode != 0:
+            shutil.rmtree(str(dest), ignore_errors=True)
+            raise HTTPException(
+                status_code=400,
+                detail=f"git clone failed: {clone.stderr.strip()}",
+            )
+    else:
+        src = Path(body.path)
+        if not src.exists():
+            raise HTTPException(status_code=400, detail=f"Path not found: {body.path}")
+
+        # git clone --local preserves .git so branch/commit refs resolve correctly.
+        clone = subprocess.run(
+            ["git", "clone", "--local", "--no-hardlinks", str(src), str(dest)],
+            capture_output=True, text=True,
+        )
+        if clone.returncode != 0:
+            # No git repo (bare folder) — fall back to plain file copy
+            shutil.copytree(
+                str(src), str(dest),
+                dirs_exist_ok=True,
+                ignore=shutil.ignore_patterns(
+                    ".git", "node_modules", "__pycache__", "*.pyc",
+                    "bin", "obj", ".vs", ".idea", "dist", "build",
+                ),
+            )
 
     ACTIVE_RUNS[run_id] = PipelineRun(
         run_id=run_id,

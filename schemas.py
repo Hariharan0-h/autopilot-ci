@@ -191,7 +191,7 @@ class PipelineRun(BaseModel):
 
 class SubmitPayload(BaseModel):
     """Accepted by POST /submit from the dashboard UI."""
-    path: str = Field(..., description="Host-local path to the codebase to scan")
+    path: str = Field(..., description="GitHub URL (https://github.com/owner/repo) or local filesystem path")
     base: str = Field("HEAD~1", description="Base branch or commit SHA")
     head: str = Field("HEAD", description="Head branch or commit SHA")
     mock: bool = Field(False, description="If true, runs demo simulation instead of real pipeline")
